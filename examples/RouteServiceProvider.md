@@ -2,7 +2,7 @@
 
 Original file: `app/Providers/RouteServiceProvider.php`
 
-# # # RouteServiceProvider Documentation
+### RouteServiceProvider Documentation
 
 ## Introduction
 
