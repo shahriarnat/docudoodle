@@ -1,0 +1,16 @@
+{
+    "name": "genericmilk/docudoodle",
+    "description": "Easily write documentation for your Codebase using AI! Perfect for legacy codebases!",
+    "autoload": {
+        "psr-4": {
+            "Genericmilk\\Docudoodle\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "Peter Day",
+            "email": "peterday.main@gmail.com"
+        }
+    ],
+    "require": {}
+}
