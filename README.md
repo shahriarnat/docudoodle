@@ -2,11 +2,11 @@
     <img src="docudoodle-icon.png" width="200" />	
 </p>
 <h1 align="center">
-    Docudoodle v1.0.0
+    Docudoodle v1.0.1
 </h1>
 
 
-This is Docudoodle! 👋 The PHP documentation generator that analyzes your codebase and creates comprehensive documentation using the OpenAI API. It's perfect for helping you and your team understand your code better through detailed insights into your application's structure and functionality.
+This is Docudoodle! 👋 The PHP documentation generator that analyzes your codebase and creates comprehensive documentation using AI. It's perfect for helping you and your team understand your code better through detailed insights into your application's structure and functionality.
 
 Docudoodle is fab if you've taken on an application with no existing documentation allowing your team to get up to speed right away.
 
@@ -17,8 +17,8 @@ Better yet, Docudoodle skips already existing documentation files. Allowing a qu
 ## Features
 
 - **Automatic Documentation Generation**: Effortlessly generates documentation for PHP files by analyzing their content.
-- **OpenAI Integration**: Leverages the power of OpenAI to create human-readable, high-quality documentation.
-- **Ollama Support**: Run documentation generation locally using your own Ollama models.
+- **Flexible AI Integration**: Choose between OpenAI's powerful cloud API or run locally with Ollama models for complete privacy.
+- **Ollama Support**: Generate documentation completely offline using your own local Ollama models - perfect for private codebases or when you need to work without an internet connection.
 - **Customizable**: Easily configure source directories, output folders, and other settings to match your workflow.
 - **Command-Line Interface**: Includes a simple command-line script for quick documentation generation.
 
@@ -40,7 +40,7 @@ Ready to create some amazing documentation? Just run this simple command:
 php artisan docudoodle:generate
 ```
 
-Don't forget to set your OpenAI key which looks a bit like this: `sk-XXXXXXXX` in the application configuration file with your actual OpenAI API key!
+If you're using OpenAI, make sure to set your API key which looks a bit like this: `sk-XXXXXXXX` in the application configuration file. If you're using Ollama, ensure it's running on your system and properly configured in your settings.
 
 ## Configuration
 
@@ -56,7 +56,20 @@ Set your OpenAI API key here or in your `.env` file as `OPENAI_API_KEY`. Keys ty
 ```php
 'default_model' => env('DOCUDOODLE_MODEL', 'gpt-4o-mini'),
 ```
-Choose which OpenAI model to use. The default is `gpt-4o-mini`, but you can change it in your `.env` file with the `DOCUDOODLE_MODEL` variable.
+Choose which model to use. The default is `gpt-4o-mini` for OpenAI, but you can specify any OpenAI model or Ollama model name in your `.env` file with the `DOCUDOODLE_MODEL` variable.
+
+### API Provider
+```php
+'default_api_provider' => env('DOCUDOODLE_API_PROVIDER', 'openai'),
+```
+Choose which API provider to use: 'openai' for cloud-based generation or 'ollama' for local generation. Set in your `.env` file with `DOCUDOODLE_API_PROVIDER`.
+
+### Ollama Configuration
+```php
+'ollama_host' => env('OLLAMA_HOST', 'localhost'),
+'ollama_port' => env('OLLAMA_PORT', '11434'),
+```
+Configure your Ollama host and port if using Ollama as the API provider. The defaults work with standard Ollama installations.
 
 ### Token Limits
 ```php
