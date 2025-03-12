@@ -1,6 +1,10 @@
-![Docudoodle Logo](docudoodle.png)
-# Docudoodle
-## by Genericmilk
+<p align="center">
+	<img src="docudoodle.png" width="200" />	
+</p>
+<h1 align="center">
+	Docudoodle v1.0.0
+</h1>
+
 
 This is Docudoodle! 👋 The PHP documentation generator that analyzes your codebase and creates comprehensive documentation using the OpenAI API. It's perfect for helping you and your team understand your code better through detailed insights into your application's structure and functionality.
 
