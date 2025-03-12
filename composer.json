@@ -2,6 +2,7 @@
     "name": "genericmilk/docudoodle",
     "description": "Generate documentation for your Laravel application using OpenAI",
     "type": "library",
+    "version": "1.0.0",
     "require": {
         "php": "^7.3|^8.0",
         "illuminate/console": "^8.0|^9.0|^10.0|^11.0",
@@ -27,11 +28,11 @@
     "license": "MIT",
     "authors": [
         {
-            "name": "Your Name",
-            "email": "your-email@example.com"
+            "name": "Peter Day",
+            "email": "peterday.main@gmail.com"
         }
     ],
-    "homepage": "https://github.com/your-vendor/docudoodle",
+    "homepage": "https://github.com/genericmilk/docudoodle",
     "keywords": [
         "documentation",
         "php",
