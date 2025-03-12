@@ -2,7 +2,7 @@
 
 Original file: `app/Providers/BroadcastServiceProvider.php`
 
-# # BroadcastServiceProvider Documentation
+## BroadcastServiceProvider Documentation
 
 ## Title: BroadcastServiceProvider - Core Provider for Broadcast Management
 
