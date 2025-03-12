@@ -13,12 +13,12 @@ class GenerateDocsCommand extends Command
      * @var string
      */
     protected $signature = 'docudoodle:generate 
-                            {--source=* : Directories to process (default: app/, config/, routes/, database/)}
-                            {--output=documentation : Output directory for documentation}
-                            {--model=gpt-4o-mini : OpenAI model to use}
-                            {--max-tokens=10000 : Maximum tokens for API calls}
-                            {--extensions=* : File extensions to process (default: php, yaml, yml)}
-                            {--skip=* : Subdirectories to skip (default: vendor/, node_modules/, tests/, cache/)}';
+                            {--source=* : Directories to process (default: from config or app/, config/, routes/, database/)}
+                            {--output= : Output directory for documentation (default: from config or "documentation")}
+                            {--model= : OpenAI model to use (default: from config or gpt-4o-mini)}
+                            {--max-tokens= : Maximum tokens for API calls (default: from config or 10000)}
+                            {--extensions=* : File extensions to process (default: from config or php, yaml, yml)}
+                            {--skip=* : Subdirectories to skip (default: from config or vendor/, node_modules/, tests/, cache/)}';
 
     /**
      * The console command description.
@@ -39,24 +39,37 @@ class GenerateDocsCommand extends Command
             return 1;
         }
         
-        // Parse command options
+        // Parse command options with config fallbacks
         $sourceDirs = $this->option('source');
         if (empty($sourceDirs)) {
-            $sourceDirs = ['app/', 'config/', 'routes/', 'database/'];
+            $sourceDirs = config('docudoodle.source_dirs', ['app/', 'config/', 'routes/', 'database/']);
         }
         
         $outputDir = $this->option('output');
+        if (empty($outputDir)) {
+            $outputDir = config('docudoodle.output_dir', 'documentation');
+        }
+        
         $model = $this->option('model');
-        $maxTokens = (int) $this->option('max-tokens');
+        if (empty($model)) {
+            $model = config('docudoodle.model', 'gpt-4o-mini');
+        }
+        
+        $maxTokens = $this->option('max-tokens');
+        if (empty($maxTokens)) {
+            $maxTokens = (int) config('docudoodle.max_tokens', 10000);
+        } else {
+            $maxTokens = (int) $maxTokens;
+        }
         
         $extensions = $this->option('extensions');
         if (empty($extensions)) {
-            $extensions = ['php', 'yaml', 'yml'];
+            $extensions = config('docudoodle.extensions', ['php', 'yaml', 'yml']);
         }
         
         $skipSubdirs = $this->option('skip');
         if (empty($skipSubdirs)) {
-            $skipSubdirs = ['vendor/', 'node_modules/', 'tests/', 'cache/'];
+            $skipSubdirs = config('docudoodle.skip_subdirs', ['vendor/', 'node_modules/', 'tests/', 'cache/']);
         }
         
         // Convert relative paths to absolute paths based on Laravel's base path
