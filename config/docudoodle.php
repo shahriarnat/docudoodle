@@ -51,4 +51,29 @@ return [
     |
     */
     'default_skip_dirs' => ['vendor/', 'node_modules/', 'tests/', 'cache/'],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Ollama Settings
+    |--------------------------------------------------------------------------
+    |
+    | Settings for the Ollama API which runs locally.
+    | 
+    | host: The host where Ollama is running (default: localhost)
+    | port: The port Ollama is listening on (default: 11434)
+    |
+    */
+    'ollama_host' => env('OLLAMA_HOST', 'localhost'),
+    'ollama_port' => env('OLLAMA_PORT', '11434'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Default API Provider
+    |--------------------------------------------------------------------------
+    |
+    | The default API provider to use for generating documentation.
+    | Supported values: 'openai', 'ollama'
+    |
+    */
+    'default_api_provider' => env('DOCUDOODLE_API_PROVIDER', 'openai'),
 ];

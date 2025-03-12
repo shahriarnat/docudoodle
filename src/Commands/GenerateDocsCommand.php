@@ -15,10 +15,11 @@ class GenerateDocsCommand extends Command
     protected $signature = 'docudoodle:generate 
                             {--source=* : Directories to process (default: from config or app/, config/, routes/, database/)}
                             {--output= : Output directory for documentation (default: from config or "documentation")}
-                            {--model= : OpenAI model to use (default: from config or gpt-4o-mini)}
+                            {--model= : Model to use (default: from config or gpt-4o-mini)}
                             {--max-tokens= : Maximum tokens for API calls (default: from config or 10000)}
                             {--extensions=* : File extensions to process (default: from config or php, yaml, yml)}
-                            {--skip=* : Subdirectories to skip (default: from config or vendor/, node_modules/, tests/, cache/)}';
+                            {--skip=* : Subdirectories to skip (default: from config or vendor/, node_modules/, tests/, cache/)}
+                            {--api-provider= : API provider to use (default: from config or openai)}';
 
     /**
      * The console command description.
@@ -32,11 +33,15 @@ class GenerateDocsCommand extends Command
      */
     public function handle()
     {
-        $apiKey = config('docudoodle.openai_api_key');
+        $apiProvider = $this->option('api-provider') ?: config('docudoodle.default_api_provider', 'openai');
+        $apiKey = '';
         
-        if (empty($apiKey)) {
-            $this->error('Oops! OpenAI API key is not set in the configuration!');
-            return 1;
+        if ($apiProvider === 'openai') {
+            $apiKey = config('docudoodle.openai_api_key');
+            if (empty($apiKey)) {
+                $this->error('Oops! OpenAI API key is not set in the configuration!');
+                return 1;
+            }
         }
         
         // Parse command options with config fallbacks
@@ -82,6 +87,7 @@ class GenerateDocsCommand extends Command
         $this->info('Starting documentation generation...');
         $this->info('Source directories: ' . implode(', ', $sourceDirs));
         $this->info('Output directory: ' . $outputDir);
+        $this->info('API provider: ' . $apiProvider);
         
         try {
             $generator = new Docudoodle(
@@ -91,7 +97,8 @@ class GenerateDocsCommand extends Command
                 $model,
                 $maxTokens,
                 $extensions,
-                $skipSubdirs
+                $skipSubdirs,
+                $apiProvider
             );
             
             $generator->generate();

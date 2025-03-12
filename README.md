@@ -18,6 +18,7 @@ Better yet, Docudoodle skips already existing documentation files. Allowing a qu
 
 - **Automatic Documentation Generation**: Effortlessly generates documentation for PHP files by analyzing their content.
 - **OpenAI Integration**: Leverages the power of OpenAI to create human-readable, high-quality documentation.
+- **Ollama Support**: Run documentation generation locally using your own Ollama models.
 - **Customizable**: Easily configure source directories, output folders, and other settings to match your workflow.
 - **Command-Line Interface**: Includes a simple command-line script for quick documentation generation.
 
