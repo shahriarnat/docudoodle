@@ -1,16 +1,44 @@
 {
-    "name": "genericmilk/docudoodle",
-    "description": "Easily write documentation for your Codebase using AI! Perfect for legacy codebases!",
+    "name": "docudoodle/docudoodle",
+    "description": "Generate documentation for your Laravel application using OpenAI",
+    "type": "library",
+    "require": {
+        "php": "^7.3|^8.0",
+        "illuminate/console": "^8.0|^9.0|^10.0|^11.0",
+        "illuminate/support": "^8.0|^9.0|^10.0|^11.0"
+    },
     "autoload": {
         "psr-4": {
-            "Genericmilk\\Docudoodle\\": "src/"
+            "Docudoodle\\": "src/"
         }
     },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Docudoodle\\DocudoodleServiceProvider"
+            ]
+        }
+    },
+    "bin": [
+        "bin/docudoodle"
+    ],
+    "require-dev": {
+        "phpunit/phpunit": "^9.5"
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "license": "MIT",
     "authors": [
         {
-            "name": "Peter Day",
-            "email": "peterday.main@gmail.com"
+            "name": "Your Name",
+            "email": "your-email@example.com"
         }
     ],
-    "require": {}
+    "homepage": "https://github.com/your-vendor/docudoodle",
+    "keywords": [
+        "documentation",
+        "php",
+        "openai",
+        "generator"
+    ]
 }

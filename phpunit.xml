@@ -1,0 +1,16 @@
+<phpunit>
+    <testsuites>
+        <testsuite name="Docudoodle Test Suite">
+            <directory>./tests</directory>
+        </testsuite>
+    </testsuites>
+    <php>
+        <ini name="error_reporting" value="-1"/>
+        <ini name="display_errors" value="1"/>
+    </php>
+    <coverage>
+        <include>
+            <directory>./src</directory>
+        </include>
+    </coverage>
+</phpunit>
