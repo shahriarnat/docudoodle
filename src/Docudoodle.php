@@ -256,9 +256,8 @@ class Docudoodle
                     ['role' => 'system', 'content' => 'You are a technical documentation specialist with expertise in PHP applications.'],
                     ['role' => 'user', 'content' => $prompt]
                 ],
-                'options' => [
-                    'num_predict' => $this->maxTokens
-                ]
+                'max_tokens' => $this->maxTokens,
+                'stream' => false
             ];
             
             // Ollama runs locally on the configured host and port
@@ -276,10 +275,12 @@ class Docudoodle
             }
             curl_close($ch);
             
+
             $responseData = json_decode($response, true);
-            
-            if (isset($responseData['message'][0]['content'])) {
-                return $responseData['message'][0]['content'];
+
+
+            if (isset($responseData['message']['content'])) {
+                return $responseData['message']['content'];
             } else {
                 throw new Exception("Unexpected API response format");
             }
