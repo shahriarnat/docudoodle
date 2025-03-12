@@ -1,5 +1,5 @@
 {
-    "name": "docudoodle/docudoodle",
+    "name": "genericmilk/docudoodle",
     "description": "Generate documentation for your Laravel application using OpenAI",
     "type": "library",
     "require": {
