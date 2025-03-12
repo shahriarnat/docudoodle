@@ -298,10 +298,3 @@ class Docudoodle
         echo "\nDocumentation generation complete! Files are available in the '{$this->outputDir}' directory.\n";
     }
 }
-
-// Example usage
-$generator = new Docudoodle(
-    "sk-XXXXXXXXXXXXXXXX"
-    // Use default values for other parameters
-);
-$generator->generate();
