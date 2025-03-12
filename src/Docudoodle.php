@@ -200,10 +200,16 @@ class Docudoodle
     /**
      * Create documentation file for a given source file
      */
-    private function createDocumentationFile($sourcePath, $relPath) {
-        // Define output path - preserve original directory structure
+    private function createDocumentationFile($sourcePath, $relPath, $sourceDir) {
+        // Define output path - preserve complete directory structure including source directory name
         $outputDir = rtrim($this->outputDir, '/') . '/';
-        $relDir = dirname($relPath);
+        
+        // Get just the source directory basename (without full path)
+        $sourceDirName = basename(rtrim($sourceDir, '/'));
+        
+        // Prepend the source directory name to the relative path to maintain the full structure
+        $fullRelPath = $sourceDirName . '/' . $relPath;
+        $relDir = dirname($fullRelPath);
         $fileName = pathinfo($relPath, PATHINFO_FILENAME);
         
         // Create proper output path
@@ -232,7 +238,7 @@ class Docudoodle
         
         // Write to file
         $fileContent = "# Documentation: " . basename($sourcePath) . "\n\n";
-        $fileContent .= "Original file: `{$relPath}`\n\n";  // Use relative path here
+        $fileContent .= "Original file: `{$fullRelPath}`\n\n";  // Use full relative path here
         $fileContent .= $docContent;
         
         file_put_contents($outputPath, $fileContent);
@@ -277,7 +283,7 @@ class Docudoodle
                 continue;
             }
             
-            $this->createDocumentationFile($sourcePath, $relFilePath);
+            $this->createDocumentationFile($sourcePath, $relFilePath, $baseDir);
         }
     }
 
