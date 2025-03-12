@@ -1,5 +1,5 @@
 <p align="center">
-	<img src="docudoodle.png" width="200" />	
+	<img src="docudoodle-icon.png" width="200" />	
 </p>
 <h1 align="center">
 	Docudoodle v1.0.0
@@ -12,7 +12,7 @@ Docudoodle is fab if you've taken on an application with no existing documentati
 
 Docudoodle writes Markdown files which show up great in Github and other source control providers allowing you to get teams up to speed in a matter of moments.
 
-Better yet, Docudoodle skips already existing documentation files. ALlowing a quick top-up run after you have concluded a feature, meaning that the entire process of getting good documentation written is a thing of the past 🚀
+Better yet, Docudoodle skips already existing documentation files. Allowing a quick top-up run after you have concluded a feature, meaning that the entire process of getting good documentation written is a thing of the past 🚀
 
 ## Features
 
