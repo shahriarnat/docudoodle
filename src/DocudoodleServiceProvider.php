@@ -21,7 +21,7 @@ class DocudoodleServiceProvider extends ServiceProvider
             
             $this->publishes([
                 __DIR__.'/../config/docudoodle.php' => config_path('docudoodle.php'),
-            ], 'config');
+            ], 'docudoodle-config');
         }
     }
 
