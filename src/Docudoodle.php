@@ -202,9 +202,12 @@ class Docudoodle
      */
     private function createDocumentationFile($sourcePath, $relPath) {
         // Define output path - preserve original directory structure
-        $outputPath = $this->outputDir . $relPath;
-        $outputPath = pathinfo($outputPath, PATHINFO_DIRNAME) . '/' . 
-                      pathinfo($outputPath, PATHINFO_FILENAME) . '.md';
+        $outputDir = rtrim($this->outputDir, '/') . '/';
+        $relDir = dirname($relPath);
+        $fileName = pathinfo($relPath, PATHINFO_FILENAME);
+        
+        // Create proper output path
+        $outputPath = $outputDir . $relDir . '/' . $fileName . '.md';
         
         // Skip if documentation file already exists
         if (file_exists($outputPath)) {
