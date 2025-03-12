@@ -278,8 +278,8 @@ class Docudoodle
             
             $responseData = json_decode($response, true);
             
-            if (isset($responseData['message']['content'])) {
-                return $responseData['message']['content'];
+            if (isset($responseData['message'][0]['content'])) {
+                return $responseData['message'][0]['content'];
             } else {
                 throw new Exception("Unexpected API response format");
             }
