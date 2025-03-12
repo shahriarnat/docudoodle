@@ -57,7 +57,7 @@ class GenerateDocsCommand extends Command
         
         $model = $this->option('model');
         if (empty($model)) {
-            $model = config('docudoodle.model', 'gpt-4o-mini');
+            $model = config('docudoodle.default_model', 'gpt-4o-mini');
         }
         
         $maxTokens = $this->option('max-tokens');
