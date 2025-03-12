@@ -76,6 +76,9 @@ class GenerateDocsCommand extends Command
         if (empty($skipSubdirs)) {
             $skipSubdirs = config('docudoodle.skip_subdirs', ['vendor/', 'node_modules/', 'tests/', 'cache/']);
         }
+
+        $ollamaHost = config('docudoodle.ollama_host', 'localhost');
+        $ollamaPort = config('docudoodle.ollama_port', 5000);
         
         // Convert relative paths to absolute paths based on Laravel's base path
         $sourceDirs = array_map(function($dir) {
@@ -98,7 +101,9 @@ class GenerateDocsCommand extends Command
                 $maxTokens,
                 $extensions,
                 $skipSubdirs,
-                $apiProvider
+                $apiProvider,
+                $ollamaHost,
+                $ollamaPort
             );
             
             $generator->generate();

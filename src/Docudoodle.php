@@ -26,26 +26,21 @@ class Docudoodle
      * @param array $allowedExtensions File extensions to process
      * @param array $skipSubdirectories Subdirectories to skip
      * @param string $apiProvider API provider to use (default: 'openai')
+     * @param string $ollamaHost Ollama host (default: 'localhost')
+     * @param int $ollamaPort Ollama port (default: 5000)
      */
     public function __construct(
-        private string $apiKey = '',
+        private string $openaiApiKey = '',
         private array $sourceDirs = ["app/", "config/", "routes/", "database/"],
         private string $outputDir = "documentation/",
         private string $model = "gpt-4o-mini",
         private int $maxTokens = 10000,
         private array $allowedExtensions = ["php", "yaml", "yml"],
         private array $skipSubdirectories = ["vendor/", "node_modules/", "tests/", "cache/"],
-        private string $apiProvider = 'openai'
-    ) {
-        $this->openaiApiKey = $apiKey;
-        $this->sourceDirs = $sourceDirs;
-        $this->outputDir = $outputDir;
-        $this->model = $model;
-        $this->maxTokens = $maxTokens;
-        $this->allowedExtensions = $allowedExtensions;
-        $this->skipSubdirectories = $skipSubdirectories;
-        $this->apiProvider = $apiProvider;
-    }
+        private string $apiProvider = 'openai',
+        private string $ollamaHost = 'localhost',
+        private int $ollamaPort = 5000,
+    ){}
 
     /**
      * Ensure the output directory exists
