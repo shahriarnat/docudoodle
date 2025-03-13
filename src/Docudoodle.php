@@ -120,6 +120,8 @@ class Docudoodle
     private function generateDocumentation($filePath, $content) {
         if ($this->apiProvider === 'ollama') {
             return $this->generateDocumentationWithOllama($filePath, $content);
+        } else if ($this->apiProvider === 'claude') {
+            return $this->generateDocumentationWithClaude($filePath, $content);
         } else {
             return $this->generateDocumentationWithOpenAI($filePath, $content);
         }
@@ -281,6 +283,89 @@ class Docudoodle
 
             if (isset($responseData['message']['content'])) {
                 return $responseData['message']['content'];
+            } else {
+                throw new Exception("Unexpected API response format");
+            }
+            
+        } catch (Exception $e) {
+            return "# Documentation Generation Error\n\nThere was an error generating documentation for this file: " . $e->getMessage();
+        }
+    }
+
+    /**
+     * Generate documentation using Claude API
+     */
+    private function generateDocumentationWithClaude($filePath, $content) {
+        try {
+            // Check content length and truncate if necessary
+            if (strlen($content) > $this->maxTokens * 4) {  // Rough estimate of token count
+                $content = substr($content, 0, $this->maxTokens * 4) . "\n...(truncated for length)...";
+            }
+            
+            // Extract file name for the title
+            $fileName = basename($filePath);
+            
+            $prompt = "
+            You are documenting a PHP codebase. Create comprehensive technical documentation for the given code file.
+            
+            File: {$filePath}
+            
+            Content:
+            ```
+            {$content}
+            ```
+            
+            Create detailed markdown documentation following this structure:
+            
+            1. Start with a descriptive title that includes the file name (e.g., \"# [ClassName] Documentation\")
+            2. Include a table of contents with links to each section when appropriate
+            3. Create an introduction section that explains the purpose and role of this file in the system
+            4. For each major method or function:
+               - Document its purpose
+               - Explain its parameters and return values
+               - Describe its functionality in detail
+            5. Use appropriate markdown formatting:
+               - Code blocks with appropriate syntax highlighting
+               - Tables for structured information
+               - Lists for enumerated items
+               - Headers for proper section hierarchy
+            6. Include technical details but explain them clearly
+            7. For controller classes, document the routes they handle
+            8. For models, document their relationships and important attributes
+            
+            Focus on accuracy and comprehensiveness. Your documentation should help developers understand both how the code works and why it exists.
+            ";
+            
+            $postData = [
+                'model' => $this->model,
+                'messages' => [
+                    ['role' => 'system', 'content' => 'You are a technical documentation specialist with expertise in PHP applications.'],
+                    ['role' => 'user', 'content' => $prompt]
+                ],
+                'max_tokens' => $this->maxTokens,
+                'stream' => false
+            ];
+            
+            // Claude API endpoint
+            $ch = curl_init("https://api.claude.ai/v1/chat/completions");
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($postData));
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                'Content-Type: application/json',
+                'Authorization: Bearer ' . $this->openaiApiKey
+            ]);
+            
+            $response = curl_exec($ch);
+            if (curl_errno($ch)) {
+                throw new Exception(curl_error($ch));
+            }
+            curl_close($ch);
+            
+            $responseData = json_decode($response, true);
+            
+            if (isset($responseData['choices'][0]['message']['content'])) {
+                return $responseData['choices'][0]['message']['content'];
             } else {
                 throw new Exception("Unexpected API response format");
             }

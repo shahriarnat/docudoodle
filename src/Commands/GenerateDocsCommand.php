@@ -42,6 +42,12 @@ class GenerateDocsCommand extends Command
                 $this->error('Oops! OpenAI API key is not set in the configuration!');
                 return 1;
             }
+        } elseif ($apiProvider === 'claude') {
+            $apiKey = config('docudoodle.claude_api_key');
+            if (empty($apiKey)) {
+                $this->error('Oops! Claude API key is not set in the configuration!');
+                return 1;
+            }
         }
         
         // Parse command options with config fallbacks

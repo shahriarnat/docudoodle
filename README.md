@@ -2,7 +2,7 @@
     <img src="docudoodle-icon.png" width="200" />	
 </p>
 <h1 align="center">
-    Docudoodle v1.0.1
+    Docudoodle v1.0.2
 </h1>
 
 
@@ -14,10 +14,13 @@ Docudoodle writes Markdown files which show up great in Github and other source 
 
 Better yet, Docudoodle skips already existing documentation files. Allowing a quick top-up run after you have concluded a feature, meaning that the entire process of getting good documentation written is a thing of the past 🚀
 
+## Examples
+If you want to see what the output of some documentation looks like, check out the [examples folder](https://github.com/genericmilk/docudoodle/tree/main/examples) in this repo which contains a few examples 🥰
+
 ## Features
 
 - **Automatic Documentation Generation**: Effortlessly generates documentation for PHP files by analyzing their content.
-- **Flexible AI Integration**: Choose between OpenAI's powerful cloud API or run locally with Ollama models for complete privacy.
+- **Flexible AI Integration**: Choose between OpenAI's powerful cloud API, Claude API, or run locally with Ollama models for complete privacy.
 - **Ollama Support**: Generate documentation completely offline using your own local Ollama models - perfect for private codebases or when you need to work without an internet connection.
 - **Customizable**: Easily configure source directories, output folders, and other settings to match your workflow.
 - **Command-Line Interface**: Includes a simple command-line script for quick documentation generation.
@@ -40,7 +43,7 @@ Ready to create some amazing documentation? Just run this simple command:
 php artisan docudoodle:generate
 ```
 
-If you're using OpenAI, make sure to set your API key which looks a bit like this: `sk-XXXXXXXX` in the application configuration file. If you're using Ollama, ensure it's running on your system and properly configured in your settings.
+If you're using OpenAI, make sure to set your API key which looks a bit like this: `sk-XXXXXXXX` in the application configuration file. If you're using Ollama, ensure it's running on your system and properly configured in your settings. For Claude, set your API key in the configuration file.
 
 ## Configuration
 
@@ -52,17 +55,23 @@ Docudoodle is highly customizable! The package includes a configuration file at 
 ```
 Set your OpenAI API key here or in your `.env` file as `OPENAI_API_KEY`. Keys typically start with `sk-XXXXXXXX`.
 
+### Claude API Key
+```php
+'claude_api_key' => env('CLAUDE_API_KEY', ''),
+```
+Set your Claude API key here or in your `.env` file as `CLAUDE_API_KEY`.
+
 ### Model Selection
 ```php
 'default_model' => env('DOCUDOODLE_MODEL', 'gpt-4o-mini'),
 ```
-Choose which model to use. The default is `gpt-4o-mini` for OpenAI, but you can specify any OpenAI model or Ollama model name in your `.env` file with the `DOCUDOODLE_MODEL` variable.
+Choose which model to use. The default is `gpt-4o-mini` for OpenAI, but you can specify any OpenAI model, Claude model, or Ollama model name in your `.env` file with the `DOCUDOODLE_MODEL` variable.
 
 ### API Provider
 ```php
 'default_api_provider' => env('DOCUDOODLE_API_PROVIDER', 'openai'),
 ```
-Choose which API provider to use: 'openai' for cloud-based generation or 'ollama' for local generation. Set in your `.env` file with `DOCUDOODLE_API_PROVIDER`.
+Choose which API provider to use: 'openai' for cloud-based generation, 'claude' for Claude API, or 'ollama' for local generation. Set in your `.env` file with `DOCUDOODLE_API_PROVIDER`.
 
 ### Ollama Configuration
 ```php
