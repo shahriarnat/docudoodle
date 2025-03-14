@@ -20,7 +20,7 @@ If you want to see what the output of some documentation looks like, check out t
 ## Features
 
 - **Automatic Documentation Generation**: Effortlessly generates documentation for PHP files by analyzing their content.
-- **Flexible AI Integration**: Choose between OpenAI's powerful cloud API, Claude API, or run locally with Ollama models for complete privacy.
+- **Flexible AI Integration**: Choose between OpenAI's powerful cloud API, Claude API, Google's Gemini API, or run locally with Ollama models for complete privacy.
 - **Ollama Support**: Generate documentation completely offline using your own local Ollama models - perfect for private codebases or when you need to work without an internet connection.
 - **Customizable**: Easily configure source directories, output folders, and other settings to match your workflow.
 - **Command-Line Interface**: Includes a simple command-line script for quick documentation generation.
@@ -61,17 +61,23 @@ Set your OpenAI API key here or in your `.env` file as `OPENAI_API_KEY`. Keys ty
 ```
 Set your Claude API key here or in your `.env` file as `CLAUDE_API_KEY`.
 
+### Gemini API Key
+```php
+'gemini_api_key' => env('GEMINI_API_KEY', ''),
+```
+Set your Gemini API key here or in your `.env` file as `GEMINI_API_KEY`.
+
 ### Model Selection
 ```php
 'default_model' => env('DOCUDOODLE_MODEL', 'gpt-4o-mini'),
 ```
-Choose which model to use. The default is `gpt-4o-mini` for OpenAI, but you can specify any OpenAI model, Claude model, or Ollama model name in your `.env` file with the `DOCUDOODLE_MODEL` variable.
+Choose which model to use. The default is `gpt-4o-mini` for OpenAI, but you can specify any OpenAI model, Claude model, Gemini model, or Ollama model name in your `.env` file with the `DOCUDOODLE_MODEL` variable.
 
 ### API Provider
 ```php
 'default_api_provider' => env('DOCUDOODLE_API_PROVIDER', 'openai'),
 ```
-Choose which API provider to use: 'openai' for cloud-based generation, 'claude' for Claude API, or 'ollama' for local generation. Set in your `.env` file with `DOCUDOODLE_API_PROVIDER`.
+Choose which API provider to use: 'openai' for cloud-based generation, 'claude' for Claude API, 'gemini' for Gemini API, or 'ollama' for local generation. Set in your `.env` file with `DOCUDOODLE_API_PROVIDER`.
 
 ### Ollama Configuration
 ```php

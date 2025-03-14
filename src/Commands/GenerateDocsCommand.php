@@ -26,7 +26,7 @@ class GenerateDocsCommand extends Command
      *
      * @var string
      */
-    protected $description = 'Generate documentation for your Laravel application using OpenAI';
+    protected $description = 'Generate documentation for your Laravel application';
 
     /**
      * Execute the console command.
@@ -46,6 +46,12 @@ class GenerateDocsCommand extends Command
             $apiKey = config('docudoodle.claude_api_key');
             if (empty($apiKey)) {
                 $this->error('Oops! Claude API key is not set in the configuration!');
+                return 1;
+            }
+        } elseif ($apiProvider === 'gemini') {
+            $apiKey = config('docudoodle.gemini_api_key');
+            if (empty($apiKey)) {
+                $this->error('Oops! Gemini API key is not set in the configuration!');
                 return 1;
             }
         }

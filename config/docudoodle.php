@@ -78,11 +78,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Gemini API Key
+    |--------------------------------------------------------------------------
+    |
+    | This key is used to authenticate with the Gemini API.
+    |
+    */
+    'gemini_api_key' => env('GEMINI_API_KEY', ''),
+
+    /*
+    |--------------------------------------------------------------------------
     | Default API Provider
     |--------------------------------------------------------------------------
     |
     | The default API provider to use for generating documentation.
-    | Supported values: 'openai', 'ollama'
+    | Supported values: 'openai', 'ollama', 'claude', 'gemini'
     |
     */
     'default_api_provider' => env('DOCUDOODLE_API_PROVIDER', 'openai'),
