@@ -2,7 +2,7 @@
     <img src="docudoodle-icon.png" width="200" />	
 </p>
 <h1 align="center">
-    Docudoodle v1.0.2
+    Docudoodle v2.0.0
 </h1>
 
 
@@ -108,6 +108,44 @@ You can publish the configuration file to your project using:
 
 ```
 php artisan vendor:publish --tag=docudoodle-config
+```
+
+## Template Variables
+
+When creating custom prompt templates for documentation generation, you can use the following variables:
+
+| Variable | Description |
+|----------|-------------|
+| `{FILE_PATH}` | The full path to the file being documented |
+| `{FILE_CONTENT}` | The content of the file being processed |
+| `{FILE_NAME}` | The filename with extension (e.g., `User.php`) |
+| `{EXTENSION}` | The file extension (e.g., `php`) |
+| `{BASE_NAME}` | The filename without extension (e.g., `User`) |
+| `{DIRECTORY}` | The directory containing the file |
+
+## Custom Template Example
+
+Create a markdown file for your custom prompt template:
+
+```markdown
+# My Custom Documentation Template
+
+Please document this {EXTENSION} file: {FILE_PATH}
+
+Here's the code:
+```{EXTENSION}
+{FILE_CONTENT}
+```
+
+Focus on explaining what this file does in simple terms.
+```
+
+Then specify the custom template path when initializing Docudoodle:
+
+```php
+$docudoodle = new Docudoodle(
+    promptTemplate: '/path/to/your/custom-template.md'
+);
 ```
 
 ## Running Tests
