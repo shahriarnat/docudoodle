@@ -868,55 +868,102 @@ class Docudoodle
         // Get all documentation files
         $allDocs = $this->getAllDocumentationFiles($outputDir);
         
-        // Build index content by organizing files by directory
+        // Build index content
         $indexContent = "# Documentation Index\n\n";
         $indexContent .= "This index is automatically generated and lists all documentation files:\n\n";
         
-        // Group files by directory
-        $groupedFiles = [];
+        // Build a nested structure of directories and files
+        $tree = [];
         foreach ($allDocs as $file) {
+            if (basename($file) === 'index.md') continue; // Skip index.md itself
+            
             $relFilePath = substr($file, strlen($outputDir));
-            $dir = dirname($relFilePath);
-            if ($dir === '.') {
-                $dir = ''; // Root directory
-            }
-            if (!isset($groupedFiles[$dir])) {
-                $groupedFiles[$dir] = [];
-            }
-            $groupedFiles[$dir][] = $file;
+            $pathParts = explode('/', trim($relFilePath, '/'));
+            
+            // Add to tree structure
+            $this->addToTree($tree, $pathParts, $file, $outputDir);
         }
         
-        // Sort directories
-        ksort($groupedFiles);
-        
-        // Build index content
-        foreach ($groupedFiles as $dir => $files) {
-            if ($dir !== '' && $dir !== '.') {
-                $indexContent .= "## " . $dir . "\n\n";
-            } else {
-                $indexContent .= "## Root\n\n";
-            }
-            
-            // Sort files in each directory
-            usort($files, function($a, $b) {
-                return basename($a) <=> basename($b);
-            });
-            
-            foreach ($files as $file) {
-                if (basename($file) === 'index.md') continue; // Skip index.md itself
-                
-                $relFilePath = substr($file, strlen($outputDir));
-                $fileName = basename($file);
-                $title = $this->getDocumentTitle($file);
-                $indexContent .= "* [{$title}]({$relFilePath})\n";
-            }
-            $indexContent .= "\n";
-        }
+        // Generate nested markdown from tree
+        $indexContent .= $this->generateNestedMarkdown($tree, $outputDir);
         
         file_put_contents($indexPath, $indexContent);
         echo "Index updated: {$indexPath}\n";
     }
     
+    /**
+     * Add a file to the nested tree structure
+     * 
+     * @param array &$tree Reference to the tree structure
+     * @param array $pathParts Path components
+     * @param string $file Full path to the file
+     * @param string $outputDir Output directory path
+     */
+    private function addToTree(array &$tree, array $pathParts, string $file, string $outputDir): void
+    {
+        if (count($pathParts) === 1) {
+            // This is a file in the current level
+            $tree['_files'][] = [
+                'path' => $file,
+                'name' => $pathParts[0],
+                'title' => $this->getDocumentTitle($file),
+                'relPath' => substr($file, strlen($outputDir))
+            ];
+            return;
+        }
+        
+        // This is a directory
+        $dirName = $pathParts[0];
+        if (!isset($tree[$dirName])) {
+            $tree[$dirName] = [];
+        }
+        
+        // Process the rest of the path
+        array_shift($pathParts);
+        $this->addToTree($tree[$dirName], $pathParts, $file, $outputDir);
+    }
+    
+    /**
+     * Generate nested markdown from the tree structure
+     * 
+     * @param array $tree The tree structure
+     * @param string $outputDir Output directory path
+     * @param int $level Current nesting level (for indentation)
+     * @return string Markdown content
+     */
+    private function generateNestedMarkdown(array $tree, string $outputDir, int $level = 0): string
+    {
+        $markdown = '';
+        $indent = str_repeat('  ', $level); // 2 spaces per level for indentation
+        
+        // First output directories (sorted alphabetically)
+        $dirs = array_keys($tree);
+        sort($dirs);
+        
+        foreach ($dirs as $dir) {
+            if ($dir === '_files') continue; // Skip the files array, process it last
+            
+            $markdown .= "{$indent}* **{$dir}/**\n";
+            $markdown .= $this->generateNestedMarkdown($tree[$dir], $outputDir, $level + 1);
+        }
+        
+        // Then output files in the current directory level
+        if (isset($tree['_files'])) {
+            // Sort files by name
+            usort($tree['_files'], function($a, $b) {
+                return $a['name'] <=> $b['name'];
+            });
+            
+            foreach ($tree['_files'] as $file) {
+                $title = $file['title'];
+                $relPath = $file['relPath'];
+                $markdown .= "{$indent}* [{$title}]({$relPath})\n";
+            }
+        }
+        
+        return $markdown;
+    }
+
     /**
      * Get the title of a markdown document
      * 
