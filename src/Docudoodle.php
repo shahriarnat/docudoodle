@@ -27,6 +27,7 @@ class Docudoodle
      * @param string $apiProvider API provider to use (default: 'openai')
      * @param string $ollamaHost Ollama host (default: 'localhost')
      * @param int $ollamaPort Ollama port (default: 5000)
+     * @param string $promptTemplate Path to prompt template markdown file
      */
     public function __construct(
         private string $openaiApiKey = "",
@@ -43,7 +44,8 @@ class Docudoodle
         ],
         private string $apiProvider = "openai",
         private string $ollamaHost = "localhost",
-        private int $ollamaPort = 5000
+        private int $ollamaPort = 5000,
+        private string $promptTemplate = __DIR__ . "/../resources/templates/default-prompt.md"
     ) {
     }
 
@@ -141,6 +143,45 @@ class Docudoodle
     }
 
     /**
+     * Load and process prompt template with variables
+     * 
+     * @param string $filePath Path to the file being documented
+     * @param string $content Content of the file being documented
+     * @return string Processed prompt with variables replaced
+     */
+    private function loadPromptTemplate(string $filePath, string $content): string
+    {
+        try {
+            // Default to built-in template if custom template doesn't exist
+            $templatePath = $this->promptTemplate;
+            if (!file_exists($templatePath)) {
+                $templatePath = __DIR__ . "/../resources/templates/default-prompt.md";
+            }
+            
+            if (!file_exists($templatePath)) {
+                throw new Exception("Prompt template not found: {$templatePath}");
+            }
+            
+            $template = file_get_contents($templatePath);
+            
+            // Replace variables in the template
+            $variables = [
+                '{FILE_PATH}' => $filePath,
+                '{FILE_CONTENT}' => $content,
+                '{FILE_NAME}' => basename($filePath),
+                '{EXTENSION}' => pathinfo($filePath, PATHINFO_EXTENSION),
+                '{BASE_NAME}' => pathinfo($filePath, PATHINFO_FILENAME),
+                '{DIRECTORY}' => dirname($filePath),
+            ];
+            
+            return str_replace(array_keys($variables), array_values($variables), $template);
+        } catch (Exception $e) {
+            // If template loading fails, return a basic default prompt
+            return "Please document the PHP file {$filePath}. Here's the content:\n\n```\n{$content}\n```";
+        }
+    }
+
+    /**
      * Generate documentation using OpenAI API
      */
     private function generateDocumentationWithOpenAI($filePath, $content): string
@@ -154,39 +195,7 @@ class Docudoodle
                     "\n...(truncated for length)...";
             }
 
-            // Extract file name for the title
-            $fileName = basename($filePath);
-
-            $prompt = "
-            You are documenting a PHP codebase. Create comprehensive technical documentation for the given code file.
-            
-            File: {$filePath}
-            
-            Content:
-            ```
-            {$content}
-            ```
-            
-            Create detailed markdown documentation following this structure:
-            
-            1. Start with a descriptive title that includes the file name (e.g., \"# [ClassName] Documentation\")
-            2. Include a table of contents with links to each section when appropriate
-            3. Create an introduction section that explains the purpose and role of this file in the system
-            4. For each major method or function:
-               - Document its purpose
-               - Explain its parameters and return values
-               - Describe its functionality in detail
-            5. Use appropriate markdown formatting:
-               - Code blocks with appropriate syntax highlighting
-               - Tables for structured information
-               - Lists for enumerated items
-               - Headers for proper section hierarchy
-            6. Include technical details but explain them clearly
-            7. For controller classes, document the routes they handle
-            8. For models, document their relationships and important attributes
-            
-            Focus on accuracy and comprehensiveness. Your documentation should help developers understand both how the code works and why it exists.
-            ";
+            $prompt = $this->loadPromptTemplate($filePath, $content);
 
             $postData = [
                 "model" => $this->model,
@@ -243,39 +252,7 @@ class Docudoodle
                     "\n...(truncated for length)...";
             }
 
-            // Extract file name for the title
-            $fileName = basename($filePath);
-
-            $prompt = "
-            You are documenting a PHP codebase. Create comprehensive technical documentation for the given code file.
-            
-            File: {$filePath}
-            
-            Content:
-            ```
-            {$content}
-            ```
-            
-            Create detailed markdown documentation following this structure:
-            
-            1. Start with a descriptive title that includes the file name (e.g., \"# [ClassName] Documentation\")
-            2. Include a table of contents with links to each section when appropriate
-            3. Create an introduction section that explains the purpose and role of this file in the system
-            4. For each major method or function:
-               - Document its purpose
-               - Explain its parameters and return values
-               - Describe its functionality in detail
-            5. Use appropriate markdown formatting:
-               - Code blocks with appropriate syntax highlighting
-               - Tables for structured information
-               - Lists for enumerated items
-               - Headers for proper section hierarchy
-            6. Include technical details but explain them clearly
-            7. For controller classes, document the routes they handle
-            8. For models, document their relationships and important attributes
-            
-            Focus on accuracy and comprehensiveness. Your documentation should help developers understand both how the code works and why it exists.
-            ";
+            $prompt = $this->loadPromptTemplate($filePath, $content);
 
             $postData = [
                 "model" => $this->model,
@@ -335,39 +312,7 @@ class Docudoodle
                     "\n...(truncated for length)...";
             }
 
-            // Extract file name for the title
-            $fileName = basename($filePath);
-
-            $prompt = "
-            You are documenting a PHP codebase. Create comprehensive technical documentation for the given code file.
-            
-            File: {$filePath}
-            
-            Content:
-            ```
-            {$content}
-            ```
-            
-            Create detailed markdown documentation following this structure:
-            
-            1. Start with a descriptive title that includes the file name (e.g., \"# [ClassName] Documentation\")
-            2. Include a table of contents with links to each section when appropriate
-            3. Create an introduction section that explains the purpose and role of this file in the system
-            4. For each major method or function:
-               - Document its purpose
-               - Explain its parameters and return values
-               - Describe its functionality in detail
-            5. Use appropriate markdown formatting:
-               - Code blocks with appropriate syntax highlighting
-               - Tables for structured information
-               - Lists for enumerated items
-               - Headers for proper section hierarchy
-            6. Include technical details but explain them clearly
-            7. For controller classes, document the routes they handle
-            8. For models, document their relationships and important attributes
-            
-            Focus on accuracy and comprehensiveness. Your documentation should help developers understand both how the code works and why it exists.
-            ";
+            $prompt = $this->loadPromptTemplate($filePath, $content);
 
             $postData = [
                 "model" => $this->model,
@@ -426,39 +371,7 @@ class Docudoodle
                     "\n...(truncated for length)...";
             }
 
-            // Extract file name for the title
-            $fileName = basename($filePath);
-
-            $prompt = "
-            You are documenting a PHP codebase. Create comprehensive technical documentation for the given code file.
-            
-            File: {$filePath}
-            
-            Content:
-            ```
-            {$content}
-            ```
-            
-            Create detailed markdown documentation following this structure:
-            
-            1. Start with a descriptive title that includes the file name (e.g., \"# [ClassName] Documentation\")
-            2. Include a table of contents with links to each section when appropriate
-            3. Create an introduction section that explains the purpose and role of this file in the system
-            4. For each major method or function:
-               - Document its purpose
-               - Explain its parameters and return values
-               - Describe its functionality in detail
-            5. Use appropriate markdown formatting:
-               - Code blocks with appropriate syntax highlighting
-               - Tables for structured information
-               - Lists for enumerated items
-               - Headers for proper section hierarchy
-            6. Include technical details but explain them clearly
-            7. For controller classes, document the routes they handle
-            8. For models, document their relationships and important attributes
-            
-            Focus on accuracy and comprehensiveness. Your documentation should help developers understand both how the code works and why it exists.
-            ";
+            $prompt = $this->loadPromptTemplate($filePath, $content);
 
             $postData = [
                 "contents" => [
