@@ -1,5 +1,5 @@
 <p align="center">
-    <img src="docudoodle-icon.png" width="200" />	
+    <img src="docudoodle.png" width="200" />	
 </p>
 <h1 align="center">
     Docudoodle v2.0.0
