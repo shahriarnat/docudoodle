@@ -30,7 +30,7 @@ If you want to see what the output of some documentation looks like, check out t
 Getting started with Docudoodle is super easy! Just use Composer with this command:
 
 ```
-composer install genericmilk/docudoodle
+composer require genericmilk/docudoodle
 ```
 
 This will set up all the necessary dependencies defined in the `composer.json` file.
