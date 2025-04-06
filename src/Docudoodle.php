@@ -668,8 +668,7 @@ class Docudoodle
             $responseData = json_decode($response, true);
 
             if (isset($responseData["message"]["content"])) {
-                // Clean the response to remove <think></think> tags
-                return $this->cleanResponse($responseData["message"]["content"]);
+                return $responseData["message"]["content"];
             } else {
                 throw new Exception("Unexpected API response format");
             }
@@ -839,6 +838,9 @@ class Docudoodle
         // Generate documentation
         echo "Generating documentation for {$sourcePath}...\n";
         $docContent = $this->generateDocumentation($sourcePath, $content);
+
+        // Clean the documentation response
+        $docContent = $this->cleanResponse($docContent);
 
         // Write to file
         $fileContent = "# Documentation: " . basename($sourcePath) . "\n\n";
