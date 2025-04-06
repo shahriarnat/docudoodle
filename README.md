@@ -2,7 +2,7 @@
     <img src="docudoodle.png" width="200" />	
 </p>
 <h1 align="center">
-    Docudoodle v2.0.0
+    Docudoodle v2.0.1
 </h1>
 
 
