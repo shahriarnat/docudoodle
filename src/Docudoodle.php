@@ -140,6 +140,14 @@ class Docudoodle
     }
 
     /**
+     * Remove <think></think> tags from the response
+     */
+    private function cleanResponse(string $response): string
+    {
+        return preg_replace('/<think>.*?<\/think>/', '', $response);
+    }
+
+    /**
      * Generate documentation using the selected API provider
      */
     private function generateDocumentation($filePath, $content): string
@@ -830,6 +838,9 @@ class Docudoodle
         // Generate documentation
         echo "Generating documentation for {$sourcePath}...\n";
         $docContent = $this->generateDocumentation($sourcePath, $content);
+
+        // Clean the documentation response
+        $docContent = $this->cleanResponse($docContent);
 
         // Write to file
         $fileContent = "# Documentation: " . basename($sourcePath) . "\n\n";
