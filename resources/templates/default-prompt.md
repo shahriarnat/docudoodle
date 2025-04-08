@@ -5,6 +5,7 @@ You are documenting a PHP codebase. Create comprehensive technical documentation
 File: {FILE_PATH}
 
 Content:
+
 ```
 {FILE_CONTENT}
 ```
@@ -12,7 +13,7 @@ Content:
 Create detailed markdown documentation following this structure:
 
 1. Start with a descriptive title that includes the file name (e.g., "# [ClassName] Documentation")
-2. Include a table of contents with links to each section when appropriate
+2. Include a table of contents with links to each section when appropriate. Use normalized links (e.g., `#method-name`).
 3. Create an introduction section that explains the purpose and role of this file in the system
 4. For each major method or function:
    - Document its purpose

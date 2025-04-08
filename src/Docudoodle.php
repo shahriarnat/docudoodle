@@ -499,6 +499,7 @@ class Docudoodle
                 '{BASE_NAME}' => pathinfo($filePath, PATHINFO_FILENAME),
                 '{DIRECTORY}' => dirname($filePath),
                 '{CONTEXT}' => $contextMd,
+                '{TOC_LINK}' => $this->normalizeForToc(basename($filePath)), // Add normalized TOC link
             ];
             
             return str_replace(array_keys($variables), array_values($variables), $template);
@@ -869,6 +870,9 @@ class Docudoodle
         $indexPath = $outputDir . "index.md";
         $relPath = substr($documentPath, strlen($outputDir));
         
+        // Replace backslashes with forward slashes for compatibility
+        $relPath = str_replace('\\', '/', $relPath);
+
         // Create a new index file if it doesn't exist
         if (!file_exists($indexPath)) {
             $indexContent = "# Documentation Index\n\n";
@@ -889,6 +893,7 @@ class Docudoodle
             if (basename($file) === 'index.md') continue; // Skip index.md itself
             
             $relFilePath = substr($file, strlen($outputDir));
+            $relFilePath = str_replace('\\', '/', $relFilePath); // Ensure forward slashes
             $pathParts = explode('/', trim($relFilePath, '/'));
             
             // Add to tree structure
@@ -901,7 +906,15 @@ class Docudoodle
         file_put_contents($indexPath, $indexContent);
         echo "Index updated: {$indexPath}\n";
     }
-    
+
+    /**
+     * Normalize a string for Table of Contents links
+     */
+    private function normalizeForToc(string $text): string
+    {
+        return strtolower(preg_replace('/[^a-z0-9]+/', '-', trim($text)));
+    }
+
     /**
      * Add a file to the nested tree structure
      * 
