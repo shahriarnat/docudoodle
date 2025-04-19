@@ -534,19 +534,73 @@ class CachingTest extends TestCase
 
     public function testCacheDefaultLocation(): void
     {
-        $this->markTestIncomplete('This test has not been implemented yet.');
+        // Define Mocks for curl functions (only need to run once)
+        $curlExecMock = $this->getFunctionMock('Docudoodle', 'curl_exec');
+        $curlErrnoMock = $this->getFunctionMock('Docudoodle', 'curl_errno');
+        $curlErrorMock = $this->getFunctionMock('Docudoodle', 'curl_error');
+        $this->getFunctionMock('Docudoodle', 'curl_close')->expects($this->any());
+        $this->getFunctionMock('Docudoodle', 'curl_init')->expects($this->any())->willReturn(curl_init());
+        $this->getFunctionMock('Docudoodle', 'curl_setopt_array')->expects($this->any());
+
+        $mockApiResponse = json_encode([
+            'choices' => [
+                ['message' => ['content' => 'Mocked AI Response']]
+            ]
+        ]);
+        $curlExecMock->expects($this->once())->willReturn($mockApiResponse);
+        $curlErrnoMock->expects($this->any())->willReturn(0);
+        $curlErrorMock->expects($this->any())->willReturn('');
+
         // 1. Create source file
-        // 2. Run generator with default cache path settings
-        // 3. Assert cache file exists at tempOutputDir/.docudoodle_cache.json
+        $this->createSourceFile('test.php', '<?php echo "Default Cache Test";');
+        $expectedDefaultCachePath = $this->tempOutputDir . '/.docudoodle_cache.json';
+
+        // 2. Run generator - Pass null for cacheFilePath to trigger default logic
+        // Note: The getGenerator helper itself defaults to $this->tempCacheFile if the arg is null,
+        // so we MUST pass null explicitly here to override the helper's internal default.
+        $generator = $this->getGenerator(cacheFilePath: null); 
+        $generator->generate();
+
+        // 3. Assert cache file exists at the default location
+        $this->assertFileExists($expectedDefaultCachePath, 'Cache file should be created at the default location.');
     }
 
     public function testCacheCustomLocationConfig(): void
     {
-        $this->markTestIncomplete('This test has not been implemented yet.');
-        // 1. Set custom cache path (outside output dir)
+        // Define Mocks for curl functions
+        $curlExecMock = $this->getFunctionMock('Docudoodle', 'curl_exec');
+        $curlErrnoMock = $this->getFunctionMock('Docudoodle', 'curl_errno');
+        $curlErrorMock = $this->getFunctionMock('Docudoodle', 'curl_error');
+        $this->getFunctionMock('Docudoodle', 'curl_close')->expects($this->any());
+        $this->getFunctionMock('Docudoodle', 'curl_init')->expects($this->any())->willReturn(curl_init());
+        $this->getFunctionMock('Docudoodle', 'curl_setopt_array')->expects($this->any());
+
+        $mockApiResponse = json_encode([
+            'choices' => [
+                ['message' => ['content' => 'Mocked AI Response']]
+            ]
+        ]);
+        $curlExecMock->expects($this->once())->willReturn($mockApiResponse);
+        $curlErrnoMock->expects($this->any())->willReturn(0);
+        $curlErrorMock->expects($this->any())->willReturn('');
+
+        // 1. Set custom cache path (outside output dir, but still in temp)
+        $customCachePath = sys_get_temp_dir() . '/' . uniqid('docudoodle_custom_cache_') . '.json';
+        $this->tempCacheFile = $customCachePath; // Update teardown target
+        $this->assertFileDoesNotExist($customCachePath, 'Custom cache file should not exist yet.');
+
         // 2. Create source file
-        // 3. Run generator passing custom path
+        $this->createSourceFile('test.php', '<?php echo "Custom Cache Test";');
+
+        // 3. Run generator passing custom path via the helper
+        $generator = $this->getGenerator(cacheFilePath: $customCachePath);
+        $generator->generate();
+
         // 4. Assert cache file exists at custom path
+        $this->assertFileExists($customCachePath, 'Cache file should be created at the custom location.');
+        // Also assert it wasn't created in the default location
+        $defaultCachePath = $this->tempOutputDir . '/.docudoodle_cache.json';
+        $this->assertFileDoesNotExist($defaultCachePath, 'Cache file should NOT be created at the default location when custom path is given.');
     }
 
     // Note: Testing command-line override requires a different approach, perhaps testing GenerateDocsCommand itself.
