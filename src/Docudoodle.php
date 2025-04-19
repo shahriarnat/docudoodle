@@ -63,6 +63,16 @@ class Docudoodle
     ];
 
     /**
+     * In-memory cache of file hashes.
+     */
+    private array $hashMap = [];
+
+    /**
+     * List of source file paths encountered during the run.
+     */
+    private array $encounteredFiles = [];
+
+    /**
      * Ensure the output directory exists
      */
     private function ensureDirectoryExists($directoryPath): void
@@ -805,6 +815,15 @@ class Docudoodle
      */
     private function createDocumentationFile($sourcePath, $relPath, $sourceDir): void
     {
+        // Check cache first if enabled
+        if ($this->useCache && !$this->forceRebuild) {
+            $currentHash = $this->calculateFileHash($sourcePath);
+            if ($currentHash !== false && isset($this->hashMap[$sourcePath]) && $this->hashMap[$sourcePath] === $currentHash) {
+                echo "Skipping unchanged file: {$sourcePath}\n";
+                return;
+            }
+        }
+
         // Define output path - preserve complete directory structure including source directory name
         $outputDir = rtrim($this->outputDir, "/") . "/";
 
@@ -852,11 +871,22 @@ class Docudoodle
 
         echo "Documentation created: {$outputPath}\n";
         
+        // Update the hash map if caching is enabled
+        if ($this->useCache) {
+            $currentHash = $this->calculateFileHash($sourcePath); // Recalculate in case file changed during processing?
+            if ($currentHash !== false) {
+                $this->hashMap[$sourcePath] = $currentHash;
+            }
+        }
+
         // Update the index after creating each documentation file
         $this->updateDocumentationIndex($outputPath, $outputDir);
 
         // Rate limiting to avoid hitting API limits
         usleep(500000); // 0.5 seconds
+
+        // Add the encountered file path to the encounteredFiles array
+        $this->encounteredFiles[] = $sourcePath;
     }
 
     /**
@@ -1077,6 +1107,9 @@ class Docudoodle
                 continue;
             }
 
+            // Record encountered file
+            $this->encounteredFiles[] = $sourcePath;
+
             $this->createDocumentationFile($sourcePath, $relFilePath, $baseDir);
         }
     }
@@ -1088,6 +1121,36 @@ class Docudoodle
     {
         // Ensure output directory exists
         $this->ensureDirectoryExists($this->outputDir);
+
+        // Initialize cache and encountered files list
+        $this->hashMap = [];
+        $this->encounteredFiles = [];
+
+        // Load existing hash map and check config hash if caching is enabled
+        if ($this->useCache && !$this->forceRebuild) {
+            $this->hashMap = $this->loadHashMap();
+            $currentConfigHash = $this->calculateConfigHash();
+            $storedConfigHash = $this->hashMap['_config_hash'] ?? null;
+
+            if ($currentConfigHash !== $storedConfigHash) {
+                echo "Configuration changed or cache invalidated. Forcing full documentation rebuild.\n";
+                // Clear file hashes but keep the config hash key for updating later
+                $fileHashes = $this->hashMap;
+                unset($fileHashes['_config_hash']);
+                $this->hashMap = ['_config_hash' => $currentConfigHash]; 
+                // Mark for rebuild internally by setting forceRebuild temporarily
+                // This ensures config hash is updated even if generate() is interrupted
+                $this->forceRebuild = true; // Temporarily force rebuild for this run
+            } else {
+                 echo "Using existing cache file: {$this->cacheFilePath}\n";
+            }
+        }
+        
+        // If forcing rebuild (either via option or config change), ensure config hash is set
+        if ($this->useCache && $this->forceRebuild) {
+             $this->hashMap['_config_hash'] = $this->calculateConfigHash();
+             echo "Cache will be rebuilt.\n";
+        }
 
         // Process each source directory
         foreach ($this->sourceDirs as $sourceDir) {
