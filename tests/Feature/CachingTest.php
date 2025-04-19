@@ -607,11 +607,57 @@ class CachingTest extends TestCase
 
     public function testCacheDisabled(): void
     {
-        $this->markTestIncomplete('This test has not been implemented yet.');
+        // Define Mocks for curl functions
+        $curlExecMock = $this->getFunctionMock('Docudoodle', 'curl_exec');
+        $curlErrnoMock = $this->getFunctionMock('Docudoodle', 'curl_errno');
+        $curlErrorMock = $this->getFunctionMock('Docudoodle', 'curl_error');
+        $this->getFunctionMock('Docudoodle', 'curl_close')->expects($this->any());
+        $this->getFunctionMock('Docudoodle', 'curl_init')->expects($this->any())->willReturn(curl_init());
+        $this->getFunctionMock('Docudoodle', 'curl_setopt_array')->expects($this->any());
+
+        // Configure mock response with timestamp to check reprocessing
+        $curlExecMock->expects($this->exactly(2)) // Expect two calls since cache is disabled
+                     ->willReturnCallback(function() {
+                         return json_encode([
+                             'choices' => [
+                                 ['message' => ['content' => 'Mocked AI Response @ ' . microtime(true)]]
+                             ]
+                         ]);
+                     });
+        $curlErrnoMock->expects($this->any())->willReturn(0);
+        $curlErrorMock->expects($this->any())->willReturn('');
+
         // 1. Create source file
+        $sourcePath = $this->createSourceFile('test.php', '<?php echo "Cache Disabled Test";');
+        $docPath = $this->tempOutputDir . '/' . basename($this->tempSourceDir) . '/test.md';
+        $defaultCachePath = $this->tempOutputDir . '/.docudoodle_cache.json';
+
         // 2. Run generator with useCache = false
+        $generator1 = $this->getGenerator(useCache: false);
+        $generator1->generate();
+
         // 3. Assert cache file does NOT exist
+        $this->assertFileDoesNotExist($defaultCachePath, 'Cache file should not be created when cache is disabled.');
+        $this->assertFileExists($docPath, 'Doc file should be created even with cache disabled.');
+        $initialDocContent = file_get_contents($docPath);
+
+        // Wait briefly
+        usleep(10000);
+
         // 4. Run generator again with useCache = false
-        // 5. Assert it processed again (check doc mod time?)
+        $generator2 = $this->getGenerator(useCache: false);
+        ob_start();
+        $generator2->generate();
+        $output = ob_get_clean();
+
+        // 5. Assert cache file still does NOT exist
+        $this->assertFileDoesNotExist($defaultCachePath, 'Cache file should still not exist on second run.');
+
+        // 6. Assert it processed again (check doc content change & output)
+        $this->assertStringNotContainsString('Skipping unchanged file', $output, 'Generator should not skip when cache disabled.');
+        $this->assertStringContainsString('Generating documentation', $output, 'Generator should generate again when cache disabled.');
+        clearstatcache();
+        $finalDocContent = file_get_contents($docPath);
+        $this->assertNotEquals($initialDocContent, $finalDocContent, 'Doc file content should change on second run when cache disabled.');
     }
 } 
