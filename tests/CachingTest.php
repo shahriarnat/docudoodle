@@ -1,10 +1,10 @@
 <?php
 
-namespace Tests\Feature;
+namespace tests;
 
 use Docudoodle\Docudoodle;
-use PHPUnit\Framework\TestCase;
 use phpmock\phpunit\PHPMock;
+use PHPUnit\Framework\TestCase;
 
 class CachingTest extends TestCase
 {
@@ -63,11 +63,11 @@ class CachingTest extends TestCase
         file_put_contents($fullPath, $content);
         return $fullPath;
     }
-    
+
     // Helper to get Docudoodle instance with basic config
     private function getGenerator(
-        bool $useCache = true, 
-        ?string $cacheFilePath = null, 
+        bool $useCache = true,
+        ?string $cacheFilePath = null,
         bool $forceRebuild = false,
         string $model = 'test-model',
         string $promptTemplatePath = __DIR__ . '/../../resources/templates/default-prompt.md'
@@ -75,9 +75,9 @@ class CachingTest extends TestCase
     {
         // Use a very simple model/API key for testing
         return new Docudoodle(
-            openaiApiKey: 'test-key', 
-            sourceDirs: [$this->tempSourceDir], 
-            outputDir: $this->tempOutputDir, 
+            openaiApiKey: 'test-key',
+            sourceDirs: [$this->tempSourceDir],
+            outputDir: $this->tempOutputDir,
             model: $model,
             maxTokens: 100,
             allowedExtensions: ['php'],
@@ -92,7 +92,7 @@ class CachingTest extends TestCase
         );
     }
 
-    // --- Test Cases --- 
+    // --- Test Cases ---
 
     public function testSkipsUnchangedFiles(): void
     {
@@ -141,7 +141,7 @@ class CachingTest extends TestCase
         $generator2->generate();
         $output = ob_get_clean();
 
-        // 5. Assert generator indicates skipping 
+        // 5. Assert generator indicates skipping
         $this->assertStringContainsString('Skipping unchanged file', $output, 'Generator output should indicate skipping.');
         $this->assertStringContainsString($sourcePath, $output, 'Generator output should mention the skipped file path.');
 
@@ -196,7 +196,7 @@ class CachingTest extends TestCase
         $this->createSourceFile('test.php', '<?php echo "Version 2 - Changed";');
         $newHash = sha1_file($sourcePath);
         $this->assertNotEquals($initialHash, $newHash, 'File hashes should differ after modification.');
-        
+
         // Update mock response for second run if needed (optional, depends on assertion needs)
         $curlExecMock->expects($this->exactly(2))->willReturnOnConsecutiveCalls(
             json_encode([
@@ -436,7 +436,7 @@ class CachingTest extends TestCase
 
         // 4. Run generator again with config Y (model-v2)
         // Pass a different model name to trigger config hash change
-        $generator2 = $this->getGenerator(model: 'model-v2'); 
+        $generator2 = $this->getGenerator(model: 'model-v2');
         ob_start();
         $generator2->generate();
         $output = ob_get_clean();
@@ -558,7 +558,7 @@ class CachingTest extends TestCase
         // 2. Run generator - Pass null for cacheFilePath to trigger default logic
         // Note: The getGenerator helper itself defaults to $this->tempCacheFile if the arg is null,
         // so we MUST pass null explicitly here to override the helper's internal default.
-        $generator = $this->getGenerator(cacheFilePath: null); 
+        $generator = $this->getGenerator(cacheFilePath: null);
         $generator->generate();
 
         // 3. Assert cache file exists at the default location
@@ -660,4 +660,4 @@ class CachingTest extends TestCase
         $finalDocContent = file_get_contents($docPath);
         $this->assertNotEquals($initialDocContent, $finalDocContent, 'Doc file content should change on second run when cache disabled.');
     }
-} 
+}
