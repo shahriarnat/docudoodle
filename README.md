@@ -110,6 +110,33 @@ You can publish the configuration file to your project using:
 php artisan vendor:publish --tag=docudoodle-config
 ```
 
+## Caching (New Feature)
+
+To improve performance and reduce API calls on subsequent runs, Docudoodle implements a caching mechanism.
+
+**How it works:**
+
+1.  When a source file is processed, a hash of its content is calculated.
+2.  This hash is stored in a cache file (`.docudoodle_cache.json` by default) alongside a hash representing the relevant parts of the configuration (model, prompt template, API provider).
+3.  On the next run:
+    *   The overall configuration hash is checked. If it differs, the cache is invalidated, and all files are reprocessed.
+    *   If the configuration hash matches, the content hash of each source file is compared to the stored hash.
+    *   Files with matching hashes are skipped.
+    *   Files with different hashes or files not found in the cache are processed, and the cache is updated.
+4.  **Orphan Cleanup:** If a source file is deleted, Docudoodle detects this and removes its corresponding documentation file from the output directory and its entry from the cache.
+
+**Configuration:**
+
+You can control caching via `config/docudoodle.php`:
+
+-   `use_cache` (boolean, default: `true`): Set to `false` to disable the caching mechanism entirely.
+-   `cache_file_path` (string|null, default: `null`): Specifies the **absolute path** to the cache file. If `null` or empty, it defaults to `.docudoodle_cache.json` inside the configured `output_dir`.
+
+**Command Line Options:**
+
+-   `--no-cache`: Disables caching for this run, forcing reprocessing of all files. This overrides the `use_cache` config setting.
+-   `--cache-path="/path/to/your/cache.json"`: Specifies a custom absolute path for the cache file for this run, overriding the `cache_file_path` config setting.
+
 ## Template Variables
 
 When creating custom prompt templates for documentation generation, you can use the following variables:
