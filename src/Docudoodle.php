@@ -55,6 +55,10 @@ class Docudoodle
         private ?string $cacheFilePath = null,
         private bool $forceRebuild = false
     ) {
+        // Ensure the cache file path is set if using cache and no specific path is provided
+        if ($this->useCache && empty($this->cacheFilePath)) {
+            $this->cacheFilePath = rtrim($this->outputDir, '/') . '/.docudoodle_cache.json';
+        }
     }
 
     /**
@@ -170,7 +174,7 @@ class Docudoodle
     {
         // Collect context about this file and its relationships before generating documentation
         $fileContext = $this->collectFileContext($filePath, $content);
-        
+
         if ($this->apiProvider === "ollama") {
             return $this->generateDocumentationWithOllama($filePath, $content, $fileContext);
         } elseif ($this->apiProvider === "claude") {
@@ -184,7 +188,7 @@ class Docudoodle
 
     /**
      * Collect context information about a file and its relationships
-     * 
+     *
      * @param string $filePath Path to the file
      * @param string $content Content of the file
      * @return array Context information
@@ -199,20 +203,20 @@ class Docudoodle
             'controllers' => [],
             'models' => [],
         ];
-        
+
         // Extract namespace and class name
         $namespace = $this->extractNamespace($content);
         $className = $this->extractClassName($content);
         $fullClassName = $namespace ? "$namespace\\$className" : $className;
-        
+
         // Extract imports/use statements
         $imports = $this->extractImports($content);
         $context['imports'] = $imports;
-        
+
         // Different analysis based on file type
         if ($fileExt === 'php') {
             // Check if this is a controller
-            if (strpos($filePath, 'Controller') !== false || 
+            if (strpos($filePath, 'Controller') !== false ||
                 strpos($className, 'Controller') !== false) {
                 $context['isController'] = true;
                 $context['controllerActions'] = $this->extractControllerActions($content);
@@ -221,9 +225,9 @@ class Docudoodle
                     'actions' => $context['controllerActions']
                 ];
             }
-            
+
             // Check if this is a model
-            if (strpos($filePath, 'Model') !== false || 
+            if (strpos($filePath, 'Model') !== false ||
                 $this->isLikelyModel($content)) {
                 $context['isModel'] = true;
                 $context['modelRelationships'] = $this->extractModelRelationships($content);
@@ -232,21 +236,21 @@ class Docudoodle
                     'relationships' => $context['modelRelationships']
                 ];
             }
-            
+
             // Find related route definitions
             $context['routes'] = $this->findRelatedRoutes($className, $fullClassName);
-        } 
-        
+        }
+
         // Check if it's a route file
-        else if ($fileExt === 'php' && (strpos($filePath, 'routes') !== false || 
-                 strpos($filePath, 'web.php') !== false || 
+        else if ($fileExt === 'php' && (strpos($filePath, 'routes') !== false ||
+                 strpos($filePath, 'web.php') !== false ||
                  strpos($filePath, 'api.php') !== false)) {
             $context['isRouteFile'] = true;
             $routeData = $this->extractRoutes($content);
             $context['definedRoutes'] = $routeData;
             $this->appContext['routes'] = array_merge($this->appContext['routes'], $routeData);
         }
-        
+
         // For all files, find related files based on imports
         foreach ($imports as $import) {
             // Convert import to possible file path
@@ -255,10 +259,10 @@ class Docudoodle
                 $context['relatedFiles'][$import] = $potentialFile;
             }
         }
-        
+
         return $context;
     }
-    
+
     /**
      * Extract namespace from PHP content
      */
@@ -269,7 +273,7 @@ class Docudoodle
         }
         return '';
     }
-    
+
     /**
      * Extract class name from PHP content
      */
@@ -280,7 +284,7 @@ class Docudoodle
         }
         return '';
     }
-    
+
     /**
      * Extract import/use statements from PHP content
      */
@@ -294,14 +298,14 @@ class Docudoodle
         }
         return $imports;
     }
-    
+
     /**
      * Extract controller action methods
      */
     private function extractControllerActions(string $content): array
     {
         $actions = [];
-        
+
         // Look for public methods that might be controller actions
         if (preg_match_all('/public\s+function\s+(\w+)\s*\([^)]*\)/i', $content, $matches)) {
             foreach ($matches[1] as $method) {
@@ -312,10 +316,10 @@ class Docudoodle
                 $actions[] = $method;
             }
         }
-        
+
         return $actions;
     }
-    
+
     /**
      * Check if a PHP file is likely a model
      */
@@ -331,35 +335,35 @@ class Docudoodle
             '/\$guarded\s*=/i',
             '/hasMany|hasOne|belongsTo|belongsToMany/i'
         ];
-        
+
         foreach ($modelPatterns as $pattern) {
             if (preg_match($pattern, $content)) {
                 return true;
             }
         }
-        
+
         return false;
     }
-    
+
     /**
      * Extract model relationships from content
      */
     private function extractModelRelationships(string $content): array
     {
         $relationships = [];
-        
-        $relationshipTypes = ['hasMany', 'hasOne', 'belongsTo', 'belongsToMany', 
-                             'hasOneThrough', 'hasManyThrough', 'morphTo', 
+
+        $relationshipTypes = ['hasMany', 'hasOne', 'belongsTo', 'belongsToMany',
+                             'hasOneThrough', 'hasManyThrough', 'morphTo',
                              'morphOne', 'morphMany', 'morphToMany'];
-                             
+
         foreach ($relationshipTypes as $type) {
-            if (preg_match_all('/function\s+(\w+)\s*\([^)]*\)[^{]*{[^}]*\$this->' . $type . '\s*\(\s*([^,\)]+)/i', 
+            if (preg_match_all('/function\s+(\w+)\s*\([^)]*\)[^{]*{[^}]*\$this->' . $type . '\s*\(\s*([^,\)]+)/i',
                 $content, $matches, PREG_SET_ORDER)) {
-                
+
                 foreach ($matches as $match) {
                     $methodName = trim($match[1]);
                     $relatedModel = trim($match[2], "'\" \t\n\r\0\x0B");
-                    
+
                     $relationships[] = [
                         'method' => $methodName,
                         'type' => $type,
@@ -368,31 +372,31 @@ class Docudoodle
                 }
             }
         }
-        
+
         return $relationships;
     }
-    
+
     /**
      * Extract routes from a routes file
      */
     private function extractRoutes(string $content): array
     {
         $routes = [];
-        
+
         // Match route definitions like Route::get('/path', 'Controller@method')
         $routePatterns = [
             // Route::get('/path', 'Controller@method')
             '/Route::(get|post|put|patch|delete|options|any)\s*\(\s*[\'"]([^\'"]+)[\'"]\s*,\s*[\'"]([^@\'"]*)@([^\'"]*)[\'"]/',
-            
+
             // Route::get('/path', [Controller::class, 'method'])
             '/Route::(get|post|put|patch|delete|options|any)\s*\(\s*[\'"]([^\'"]+)[\'"]\s*,\s*\[\s*([^:,]+)::class\s*,\s*[\'"]([^\'"]+)[\'"]/',
-            
+
             // Route names: ->name('route.name')
             '/->name\s*\(\s*[\'"]([^\'"]+)[\'"]/'
         ];
-        
+
         $currentRoute = null;
-        
+
         // Split content by lines to process one at a time
         $lines = explode("\n", $content);
         foreach ($lines as $line) {
@@ -424,30 +428,30 @@ class Docudoodle
                 }
             }
         }
-        
+
         return $routes;
     }
-    
+
     /**
      * Find routes related to a controller
      */
     private function findRelatedRoutes(string $className, string $fullClassName): array
     {
         $relatedRoutes = [];
-        
+
         foreach ($this->appContext['routes'] as $route) {
             if (isset($route['controller'])) {
                 // Check against both short and full class names
-                if ($route['controller'] === $className || 
+                if ($route['controller'] === $className ||
                     $route['controller'] === $fullClassName) {
                     $relatedRoutes[] = $route;
                 }
             }
         }
-        
+
         return $relatedRoutes;
     }
-    
+
     /**
      * Try to find a file based on an import statement
      */
@@ -455,16 +459,16 @@ class Docudoodle
     {
         // Convert namespace to path (App\Http\Controllers\UserController -> app/Http/Controllers/UserController.php)
         $potentialPath = str_replace('\\', '/', $import) . '.php';
-        
+
         // Try common base directories
         $baseDirs = $this->sourceDirs;
-        
+
         foreach ($baseDirs as $baseDir) {
             $fullPath = $baseDir . '/' . $potentialPath;
             if (file_exists($fullPath)) {
                 return $fullPath;
             }
-            
+
             // Try with lowercase first directory
             $parts = explode('/', $potentialPath);
             if (count($parts) > 0) {
@@ -476,13 +480,13 @@ class Docudoodle
                 }
             }
         }
-        
+
         return '';
     }
 
     /**
      * Load and process prompt template with variables and context
-     * 
+     *
      * @param string $filePath Path to the file being documented
      * @param string $content Content of the file being documented
      * @param array $context Additional context information about the file
@@ -496,16 +500,16 @@ class Docudoodle
             if (!file_exists($templatePath)) {
                 $templatePath = __DIR__ . "/../resources/templates/default-prompt.md";
             }
-            
+
             if (!file_exists($templatePath)) {
                 throw new Exception("Prompt template not found: {$templatePath}");
             }
-            
+
             $template = file_get_contents($templatePath);
-            
+
             // Format the context information as markdown
             $contextMd = $this->formatContextAsMarkdown($context);
-            
+
             // Replace variables in the template
             $variables = [
                 '{FILE_PATH}' => $filePath,
@@ -517,7 +521,7 @@ class Docudoodle
                 '{CONTEXT}' => $contextMd,
                 '{TOC_LINK}' => $this->normalizeForToc(basename($filePath)), // Add normalized TOC link
             ];
-            
+
             return str_replace(array_keys($variables), array_values($variables), $template);
         } catch (Exception $e) {
             // If template loading fails, return a basic default prompt
@@ -527,14 +531,14 @@ class Docudoodle
 
     /**
      * Format context information as markdown
-     * 
+     *
      * @param array $context Context information
      * @return string Formatted context as markdown
      */
     private function formatContextAsMarkdown(array $context): string
     {
         $md = "";
-        
+
         if (!empty($context['imports'])) {
             $md .= "### Imports\n";
             foreach ($context['imports'] as $import) {
@@ -542,7 +546,7 @@ class Docudoodle
             }
             $md .= "\n";
         }
-        
+
         if (!empty($context['relatedFiles'])) {
             $md .= "### Related Files\n";
             foreach ($context['relatedFiles'] as $import => $file) {
@@ -550,7 +554,7 @@ class Docudoodle
             }
             $md .= "\n";
         }
-        
+
         if (!empty($context['routes'])) {
             $md .= "### Related Routes\n";
             foreach ($context['routes'] as $route) {
@@ -558,7 +562,7 @@ class Docudoodle
             }
             $md .= "\n";
         }
-        
+
         if (!empty($context['controllerActions'])) {
             $md .= "### Controller Actions\n";
             foreach ($context['controllerActions'] as $action) {
@@ -566,7 +570,7 @@ class Docudoodle
             }
             $md .= "\n";
         }
-        
+
         if (!empty($context['modelRelationships'])) {
             $md .= "### Model Relationships\n";
             foreach ($context['modelRelationships'] as $relationship) {
@@ -574,7 +578,7 @@ class Docudoodle
             }
             $md .= "\n";
         }
-        
+
         return $md;
     }
 
@@ -788,7 +792,7 @@ class Docudoodle
 
             // Determine which Gemini model to use (gemini-1.5-pro by default if not specified)
             $geminiModel = ($this->model === "gemini" || $this->model === "gemini-pro") ? "gemini-1.5-pro" : $this->model;
-            
+
             $ch = curl_init("https://generativelanguage.googleapis.com/v1beta/models/{$geminiModel}:generateContent?key={$this->openaiApiKey}");
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_POST, true);
@@ -870,7 +874,7 @@ class Docudoodle
         file_put_contents($outputPath, $fileContent);
 
         echo "Documentation created: {$outputPath}\n";
-        
+
         // Update the hash map if caching is enabled
         if ($this->useCache) {
             $currentHash = $this->calculateFileHash($sourcePath); // Recalculate in case file changed during processing?
@@ -891,7 +895,7 @@ class Docudoodle
 
     /**
      * Update the documentation index file
-     * 
+     *
      * @param string $documentPath Path to the newly created document
      * @param string $outputDir Base directory for documentation
      */
@@ -899,7 +903,7 @@ class Docudoodle
     {
         $indexPath = $outputDir . "index.md";
         $relPath = substr($documentPath, strlen($outputDir));
-        
+
         // Replace backslashes with forward slashes for compatibility
         $relPath = str_replace('\\', '/', $relPath);
 
@@ -909,30 +913,30 @@ class Docudoodle
             $indexContent .= "This index is automatically generated and lists all documentation files:\n\n";
             file_put_contents($indexPath, $indexContent);
         }
-        
+
         // Get all documentation files
         $allDocs = $this->getAllDocumentationFiles($outputDir);
-        
+
         // Build index content
         $indexContent = "# Documentation Index\n\n";
         $indexContent .= "This index is automatically generated and lists all documentation files:\n\n";
-        
+
         // Build a nested structure of directories and files
         $tree = [];
         foreach ($allDocs as $file) {
             if (basename($file) === 'index.md') continue; // Skip index.md itself
-            
+
             $relFilePath = substr($file, strlen($outputDir));
             $relFilePath = str_replace('\\', '/', $relFilePath); // Ensure forward slashes
             $pathParts = explode('/', trim($relFilePath, '/'));
-            
+
             // Add to tree structure
             $this->addToTree($tree, $pathParts, $file, $outputDir);
         }
-        
+
         // Generate nested markdown from tree
         $indexContent .= $this->generateNestedMarkdown($tree, $outputDir);
-        
+
         file_put_contents($indexPath, $indexContent);
         echo "Index updated: {$indexPath}\n";
     }
@@ -947,7 +951,7 @@ class Docudoodle
 
     /**
      * Add a file to the nested tree structure
-     * 
+     *
      * @param array &$tree Reference to the tree structure
      * @param array $pathParts Path components
      * @param string $file Full path to the file
@@ -965,21 +969,21 @@ class Docudoodle
             ];
             return;
         }
-        
+
         // This is a directory
         $dirName = $pathParts[0];
         if (!isset($tree[$dirName])) {
             $tree[$dirName] = [];
         }
-        
+
         // Process the rest of the path
         array_shift($pathParts);
         $this->addToTree($tree[$dirName], $pathParts, $file, $outputDir);
     }
-    
+
     /**
      * Generate nested markdown from the tree structure
-     * 
+     *
      * @param array $tree The tree structure
      * @param string $outputDir Output directory path
      * @param int $level Current nesting level (for indentation)
@@ -989,38 +993,38 @@ class Docudoodle
     {
         $markdown = '';
         $indent = str_repeat('  ', $level); // 2 spaces per level for indentation
-        
+
         // First output directories (sorted alphabetically)
         $dirs = array_keys($tree);
         sort($dirs);
-        
+
         foreach ($dirs as $dir) {
             if ($dir === '_files') continue; // Skip the files array, process it last
-            
+
             $markdown .= "{$indent}* **{$dir}/**\n";
             $markdown .= $this->generateNestedMarkdown($tree[$dir], $outputDir, $level + 1);
         }
-        
+
         // Then output files in the current directory level
         if (isset($tree['_files'])) {
             // Sort files by name
             usort($tree['_files'], function($a, $b) {
                 return $a['name'] <=> $b['name'];
             });
-            
+
             foreach ($tree['_files'] as $file) {
                 $title = $file['title'];
                 $relPath = $file['relPath'];
                 $markdown .= "{$indent}* [{$title}]({$relPath})\n";
             }
         }
-        
+
         return $markdown;
     }
 
     /**
      * Get the title of a markdown document
-     * 
+     *
      * @param string $filePath Path to the markdown file
      * @return string The title or fallback to filename
      */
@@ -1029,43 +1033,43 @@ class Docudoodle
         if (!file_exists($filePath)) {
             return basename($filePath);
         }
-        
+
         $content = file_get_contents($filePath);
         // Try to find the first heading
         if (preg_match('/^#\s+(.+)$/m', $content, $matches)) {
             return trim($matches[1]);
         }
-        
+
         return pathinfo($filePath, PATHINFO_FILENAME);
     }
-    
+
     /**
      * Get all documentation files in the output directory
-     * 
+     *
      * @param string $outputDir The documentation output directory
      * @return array List of markdown files
      */
     private function getAllDocumentationFiles(string $outputDir): array
     {
         $files = [];
-        
+
         if (!is_dir($outputDir)) {
             return $files;
         }
-        
+
         $iterator = new RecursiveIteratorIterator(
             new RecursiveDirectoryIterator(
                 $outputDir,
                 RecursiveDirectoryIterator::SKIP_DOTS
             )
         );
-        
+
         foreach ($iterator as $file) {
             if ($file->isFile() && $file->getExtension() === 'md') {
                 $files[] = $file->getPathname();
             }
         }
-        
+
         return $files;
     }
 
@@ -1131,13 +1135,13 @@ class Docudoodle
             $this->hashMap = $this->loadHashMap();
             $currentConfigHash = $this->calculateConfigHash();
             $storedConfigHash = $this->hashMap['_config_hash'] ?? null;
-
+            
             if ($currentConfigHash !== $storedConfigHash) {
                 echo "Configuration changed or cache invalidated. Forcing full documentation rebuild.\n";
                 // Clear file hashes but keep the config hash key for updating later
                 $fileHashes = $this->hashMap;
                 unset($fileHashes['_config_hash']);
-                $this->hashMap = ['_config_hash' => $currentConfigHash]; 
+                $this->hashMap = ['_config_hash' => $currentConfigHash];
                 // Mark for rebuild internally by setting forceRebuild temporarily
                 // This ensures config hash is updated even if generate() is interrupted
                 $this->forceRebuild = true; // Temporarily force rebuild for this run
@@ -1145,7 +1149,7 @@ class Docudoodle
                  echo "Using existing cache file: {$this->cacheFilePath}\n";
             }
         }
-        
+
         // If forcing rebuild (either via option or config change), ensure config hash is set
         if ($this->useCache && $this->forceRebuild) {
              $this->hashMap['_config_hash'] = $this->calculateConfigHash();
@@ -1161,7 +1165,7 @@ class Docudoodle
                 echo "Directory not found: {$sourceDir}\n";
             }
         }
-        
+
         // --- Start Orphan Cleanup ---
         if ($this->useCache) {
             $cachedFiles = array_keys(array_filter($this->hashMap, fn($key) => $key !== '_config_hash', ARRAY_FILTER_USE_KEY));
@@ -1178,7 +1182,7 @@ class Docudoodle
                         // Ensure consistent directory separators and trailing slash for comparison
                         $normalizedDir = rtrim(str_replace('\\', '/', $dir), '/') . '/';
                         $normalizedOrphanPath = str_replace('\\', '/', $orphanSourcePath);
-                        
+
                         if (strpos($normalizedOrphanPath, $normalizedDir) === 0) {
                             $baseSourceDir = $dir;
                             break;
@@ -1200,14 +1204,14 @@ class Docudoodle
                     } else {
                         echo "Warning: Could not determine source directory for orphan path: {$orphanSourcePath}\n";
                     }
-                    
+
                     // Remove orphan from the hash map regardless
                     unset($this->hashMap[$orphanSourcePath]);
                 }
             }
         }
         // --- End Orphan Cleanup ---
-        
+
         // Make sure the index is fully up to date
         $this->finalizeDocumentationIndex();
 
@@ -1218,7 +1222,7 @@ class Docudoodle
 
         echo "\nDocumentation generation complete! Files are available in the '{$this->outputDir}' directory.\n";
     }
-    
+
     /**
      * Finalize the documentation index to ensure it's complete
      */
@@ -1294,10 +1298,11 @@ class Docudoodle
      */
     private function calculateConfigHash(): string
     {
+        $realTemplatePath = realpath($this->promptTemplate) ?: $this->promptTemplate; // Use realpath or fallback
         $configData = [
             'model' => $this->model,
             'apiProvider' => $this->apiProvider,
-            'promptTemplatePath' => $this->promptTemplate,
+            'promptTemplatePath' => $realTemplatePath, // Use normalized path
             'promptTemplateContent' => file_exists($this->promptTemplate) ? sha1_file($this->promptTemplate) : 'template_not_found'
         ];
         return sha1(json_encode($configData));

@@ -166,10 +166,11 @@ class BuildCacheCommand extends Command
      */
     private function calculateConfigHash(string $model, string $apiProvider, string $promptTemplatePath): string
     {
+        $realTemplatePath = realpath($promptTemplatePath) ?: $promptTemplatePath; // Use realpath or fallback
         $configData = [
             'model' => $model,
             'apiProvider' => $apiProvider,
-            'promptTemplatePath' => $promptTemplatePath,
+            'promptTemplatePath' => $realTemplatePath, // Use normalized path
             'promptTemplateContent' => file_exists($promptTemplatePath) ? sha1_file($promptTemplatePath) : 'template_not_found'
         ];
         return sha1(json_encode($configData));
