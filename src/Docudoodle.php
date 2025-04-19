@@ -844,12 +844,6 @@ class Docudoodle
         // Create proper output path
         $outputPath = $outputDir . $relDir . "/" . $fileName . ".md";
 
-        // Skip if documentation file already exists
-        if (file_exists($outputPath)) {
-            echo "Documentation already exists: {$outputPath} - skipping\n";
-            return;
-        }
-
         // Ensure the directory exists
         $this->ensureDirectoryExists(dirname($outputPath));
 

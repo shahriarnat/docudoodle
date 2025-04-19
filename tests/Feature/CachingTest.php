@@ -151,14 +151,81 @@ class CachingTest extends TestCase
 
     public function testReprocessesChangedFiles(): void
     {
-        $this->markTestIncomplete('This test has not been implemented yet.');
+        // Define Mocks for curl functions
+        $curlExecMock = $this->getFunctionMock('Docudoodle', 'curl_exec');
+        $curlErrnoMock = $this->getFunctionMock('Docudoodle', 'curl_errno');
+        $curlErrorMock = $this->getFunctionMock('Docudoodle', 'curl_error');
+        $this->getFunctionMock('Docudoodle', 'curl_close')->expects($this->any());
+        $this->getFunctionMock('Docudoodle', 'curl_init')->expects($this->any())->willReturn(curl_init());
+        $this->getFunctionMock('Docudoodle', 'curl_setopt_array')->expects($this->any());
+
+        $mockApiResponse = json_encode([
+            'choices' => [
+                ['message' => ['content' => 'Mocked AI Response v1']]
+            ]
+        ]);
+        $curlExecMock->expects($this->atLeastOnce())->willReturn($mockApiResponse); // Expect it to be called
+        $curlErrnoMock->expects($this->any())->willReturn(0);
+        $curlErrorMock->expects($this->any())->willReturn('');
+
         // 1. Create source file
+        $sourcePath = $this->createSourceFile('test.php', '<?php echo "Version 1";');
+        $docPath = $this->tempOutputDir . '/' . basename($this->tempSourceDir) . '/test.md';
+        $cachePath = $this->tempCacheFile;
+        $initialHash = sha1_file($sourcePath);
+
         // 2. Run generator
-        // 3. Get doc file mod time/hash, cache file content
+        $generator1 = $this->getGenerator();
+        $generator1->generate();
+
+        // 3. Get initial state
+        $this->assertFileExists($docPath);
+        $this->assertFileExists($cachePath);
+        $initialDocModTime = filemtime($docPath);
+        $initialCacheData = json_decode(file_get_contents($cachePath), true);
+        $this->assertEquals($initialHash, $initialCacheData[$sourcePath] ?? null, 'Initial cache should contain correct hash.');
+
+        // Wait briefly
+        usleep(10000);
+
         // 4. Modify source file
+        $this->createSourceFile('test.php', '<?php echo "Version 2 - Changed";');
+        $newHash = sha1_file($sourcePath);
+        $this->assertNotEquals($initialHash, $newHash, 'File hashes should differ after modification.');
+        
+        // Update mock response for second run if needed (optional, depends on assertion needs)
+        $mockApiResponseV2 = json_encode([
+            'choices' => [
+                ['message' => ['content' => 'Mocked AI Response v2']]
+            ]
+        ]);
+        // Re-configure mock if you want to ensure it returns V2 specifically on the second call
+        // $curlExecMock->expects($this->exactly(2))->willReturnOnConsecutiveCalls($mockApiResponse, $mockApiResponseV2); 
+        // For simplicity, we can let the existing mock return the same $mockApiResponse (V1)
+        // as we primarily care that the file was reprocessed, not the exact AI content.
+
         // 5. Run generator again
+        $generator2 = $this->getGenerator();
+        // Capture output to ensure it DOES NOT say skipping
+        ob_start();
+        $generator2->generate();
+        $output = ob_get_clean();
+
+        // Assert it didn't skip
+        $this->assertStringNotContainsString('Skipping unchanged file', $output, 'Generator output should NOT indicate skipping.');
+        $this->assertStringContainsString('Generating documentation', $output, 'Generator output should indicate generation.');
+
         // 6. Assert doc file mod time/hash changed
+        $this->assertFileExists($docPath);
+        clearstatcache(); // Clear stat cache before checking filemtime again
+        $finalDocModTime = filemtime($docPath);
+        $this->assertGreaterThan($initialDocModTime, $finalDocModTime, 'Documentation file modification time should update on second run.');
+
         // 7. Assert cache file content updated with new hash
+        $this->assertFileExists($cachePath);
+        $finalCacheData = json_decode(file_get_contents($cachePath), true);
+        $this->assertEquals($newHash, $finalCacheData[$sourcePath] ?? null, 'Cache should be updated with the new hash.');
+        $this->assertEquals($initialCacheData['_config_hash'] ?? null, $finalCacheData['_config_hash'] ?? null, 'Config hash should not change.');
     }
 
     public function testProcessesNewFiles(): void
