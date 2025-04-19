@@ -1114,4 +1114,78 @@ class Docudoodle
         $this->updateDocumentationIndex("", $outputDir);
         echo "Documentation index finalized.\n";
     }
+
+    /**
+     * Load the hash map from the cache file.
+     *
+     * @return array The loaded hash map or empty array on failure/not found.
+     */
+    private function loadHashMap(): array
+    {
+        if (!$this->useCache || !$this->cacheFilePath || !file_exists($this->cacheFilePath)) {
+            return [];
+        }
+
+        try {
+            $content = file_get_contents($this->cacheFilePath);
+            $map = json_decode($content, true);
+            return is_array($map) ? $map : [];
+        } catch (Exception $e) {
+            echo "Warning: Could not read or decode cache file: {$this->cacheFilePath} - {$e->getMessage()}\n";
+            return [];
+        }
+    }
+
+    /**
+     * Save the hash map to the cache file.
+     *
+     * @param array $map The hash map data to save.
+     */
+    private function saveHashMap(array $map): void
+    {
+        if (!$this->useCache || !$this->cacheFilePath) {
+            return;
+        }
+
+        try {
+            $this->ensureDirectoryExists(dirname($this->cacheFilePath));
+            $content = json_encode($map, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+            if ($content === false) {
+                throw new Exception("Failed to encode hash map to JSON.");
+            }
+            file_put_contents($this->cacheFilePath, $content);
+        } catch (Exception $e) {
+            echo "Warning: Could not save cache file: {$this->cacheFilePath} - {$e->getMessage()}\n";
+        }
+    }
+
+    /**
+     * Calculate the SHA1 hash of a file's content.
+     *
+     * @param string $filePath Path to the file.
+     * @return string|false The SHA1 hash or false on failure.
+     */
+    private function calculateFileHash(string $filePath): string|false
+    {
+        if (!file_exists($filePath)) {
+            return false;
+        }
+        return sha1_file($filePath);
+    }
+
+    /**
+     * Calculate a hash representing the current configuration relevant to caching.
+     *
+     * @return string The configuration hash.
+     */
+    private function calculateConfigHash(): string
+    {
+        $configData = [
+            'model' => $this->model,
+            'apiProvider' => $this->apiProvider,
+            'promptTemplatePath' => $this->promptTemplate,
+            'promptTemplateContent' => file_exists($this->promptTemplate) ? sha1_file($this->promptTemplate) : 'template_not_found'
+        ];
+        return sha1(json_encode($configData));
+    }
 }
