@@ -51,24 +51,10 @@ class Docudoodle
         private string $ollamaHost = "localhost",
         private int $ollamaPort = 5000,
         private string $promptTemplate = __DIR__ . "/../resources/templates/default-prompt.md",
-        bool $useCache = true,
-        ?string $cacheFilePath = null,
+        private bool $useCache = true,
+        private ?string $cacheFilePath = null,
         private bool $forceRebuild = false
     ) {
-        // Assign properties
-        $this->useCache = $useCache;
-
-        // Determine final cache file path
-        if ($useCache) {
-            if (!empty($cacheFilePath)) {
-                $this->cacheFilePath = $cacheFilePath;
-            } else {
-                // Default to .docudoodle_cache.json inside output directory
-                $this->cacheFilePath = rtrim($this->outputDir, '/') . '/.docudoodle_cache.json';
-            }
-        } else {
-            $this->cacheFilePath = null; // Ensure path is null if caching is disabled
-        }
     }
 
     /**
