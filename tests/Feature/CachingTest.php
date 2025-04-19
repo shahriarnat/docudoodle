@@ -161,12 +161,14 @@ class CachingTest extends TestCase
         $this->getFunctionMock('Docudoodle', 'curl_init')->expects($this->any())->willReturn(curl_init());
         $this->getFunctionMock('Docudoodle', 'curl_setopt_array')->expects($this->any());
 
-        $mockApiResponse = json_encode([
-            'choices' => [
-                ['message' => ['content' => 'Mocked AI Response v1']]
-            ]
-        ]);
-        $curlExecMock->expects($this->atLeastOnce())->willReturn($mockApiResponse); // Expect it to be called
+        $curlExecMock->expects($this->atLeastOnce())
+                     ->willReturnCallback(function() {
+                         return json_encode([
+                             'choices' => [
+                                 ['message' => ['content' => 'Mocked AI Response @ ' . microtime(true)]]
+                             ]
+                         ]);
+                     });
         $curlErrnoMock->expects($this->any())->willReturn(0);
         $curlErrorMock->expects($this->any())->willReturn('');
 
@@ -196,15 +198,18 @@ class CachingTest extends TestCase
         $this->assertNotEquals($initialHash, $newHash, 'File hashes should differ after modification.');
         
         // Update mock response for second run if needed (optional, depends on assertion needs)
-        $mockApiResponseV2 = json_encode([
-            'choices' => [
-                ['message' => ['content' => 'Mocked AI Response v2']]
-            ]
-        ]);
-        // Re-configure mock if you want to ensure it returns V2 specifically on the second call
-        // $curlExecMock->expects($this->exactly(2))->willReturnOnConsecutiveCalls($mockApiResponse, $mockApiResponseV2); 
-        // For simplicity, we can let the existing mock return the same $mockApiResponse (V1)
-        // as we primarily care that the file was reprocessed, not the exact AI content.
+        $curlExecMock->expects($this->exactly(2))->willReturnOnConsecutiveCalls(
+            json_encode([
+                'choices' => [
+                    ['message' => ['content' => 'Mocked AI Response @ ' . microtime(true)]]
+                ]
+            ]),
+            json_encode([
+                'choices' => [
+                    ['message' => ['content' => 'Mocked AI Response @ ' . microtime(true)]]
+                ]
+            ])
+        );
 
         // 5. Run generator again
         $generator2 = $this->getGenerator();
@@ -240,12 +245,14 @@ class CachingTest extends TestCase
         $this->getFunctionMock('Docudoodle', 'curl_init')->expects($this->any())->willReturn(curl_init());
         $this->getFunctionMock('Docudoodle', 'curl_setopt_array')->expects($this->any());
 
-        $mockApiResponse = json_encode([
-            'choices' => [
-                ['message' => ['content' => 'Mocked AI Response']]
-            ]
-        ]);
-        $curlExecMock->expects($this->atLeastOnce())->willReturn($mockApiResponse);
+        $curlExecMock->expects($this->atLeastOnce())
+                     ->willReturnCallback(function() {
+                         return json_encode([
+                             'choices' => [
+                                 ['message' => ['content' => 'Mocked AI Response @ ' . microtime(true)]]
+                             ]
+                         ]);
+                     });
         $curlErrnoMock->expects($this->any())->willReturn(0);
         $curlErrorMock->expects($this->any())->willReturn('');
 
@@ -313,12 +320,14 @@ class CachingTest extends TestCase
         $this->getFunctionMock('Docudoodle', 'curl_init')->expects($this->any())->willReturn(curl_init());
         $this->getFunctionMock('Docudoodle', 'curl_setopt_array')->expects($this->any());
 
-        $mockApiResponse = json_encode([
-            'choices' => [
-                ['message' => ['content' => 'Mocked AI Response']]
-            ]
-        ]);
-        $curlExecMock->expects($this->atLeastOnce())->willReturn($mockApiResponse);
+        $curlExecMock->expects($this->atLeastOnce())
+                     ->willReturnCallback(function() {
+                         return json_encode([
+                             'choices' => [
+                                 ['message' => ['content' => 'Mocked AI Response @ ' . microtime(true)]]
+                             ]
+                         ]);
+                     });
         $curlErrnoMock->expects($this->any())->willReturn(0);
         $curlErrorMock->expects($this->any())->willReturn('');
 
@@ -390,12 +399,14 @@ class CachingTest extends TestCase
         $this->getFunctionMock('Docudoodle', 'curl_init')->expects($this->any())->willReturn(curl_init());
         $this->getFunctionMock('Docudoodle', 'curl_setopt_array')->expects($this->any());
 
-        $mockApiResponse = json_encode([
-            'choices' => [
-                ['message' => ['content' => 'Mocked AI Response']]
-            ]
-        ]);
-        $curlExecMock->expects($this->atLeastOnce())->willReturn($mockApiResponse);
+        $curlExecMock->expects($this->atLeastOnce())
+                     ->willReturnCallback(function() {
+                         return json_encode([
+                             'choices' => [
+                                 ['message' => ['content' => 'Mocked AI Response @ ' . microtime(true)]]
+                             ]
+                         ]);
+                     });
         $curlErrnoMock->expects($this->any())->willReturn(0);
         $curlErrorMock->expects($this->any())->willReturn('');
 
@@ -456,13 +467,69 @@ class CachingTest extends TestCase
 
     public function testForceRebuildFlag(): void
     {
-        $this->markTestIncomplete('This test has not been implemented yet.');
+        // Define Mocks for curl functions
+        $curlExecMock = $this->getFunctionMock('Docudoodle', 'curl_exec');
+        $curlErrnoMock = $this->getFunctionMock('Docudoodle', 'curl_errno');
+        $curlErrorMock = $this->getFunctionMock('Docudoodle', 'curl_error');
+        $this->getFunctionMock('Docudoodle', 'curl_close')->expects($this->any());
+        $this->getFunctionMock('Docudoodle', 'curl_init')->expects($this->any())->willReturn(curl_init());
+        $this->getFunctionMock('Docudoodle', 'curl_setopt_array')->expects($this->any());
+
+        // Configure mock responses with a callback to include a timestamp
+        $curlExecMock->expects($this->atLeastOnce()) // Expect at least one call
+                     ->willReturnCallback(function() {
+                         return json_encode([
+                             'choices' => [
+                                 ['message' => ['content' => 'Mocked AI Response @ ' . microtime(true)]]
+                             ]
+                         ]);
+                     });
+        $curlErrnoMock->expects($this->any())->willReturn(0);
+        $curlErrorMock->expects($this->any())->willReturn('');
+
         // 1. Create source file
-        // 2. Run generator
-        // 3. Get doc file mod time/hash
+        $sourcePath = $this->createSourceFile('test.php', '<?php echo "Content";');
+        $docPath = $this->tempOutputDir . '/' . basename($this->tempSourceDir) . '/test.md';
+        $cachePath = $this->tempCacheFile;
+        $fileHash = sha1_file($sourcePath);
+
+        // 2. Run generator normally
+        $generator1 = $this->getGenerator();
+        $generator1->generate();
+
+        // 3. Get initial state
+        $this->assertFileExists($docPath, 'Doc file should exist after first run.');
+        $initialDocContent = file_get_contents($docPath); // Get initial content
+        $this->assertFileExists($cachePath, 'Cache file should exist after first run.');
+        $cacheData1 = json_decode(file_get_contents($cachePath), true);
+        $this->assertEquals($fileHash, $cacheData1[$sourcePath] ?? null);
+
+        // Wait briefly
+        usleep(10000);
+
         // 4. Run generator again with forceRebuild = true
-        // 5. Assert doc file mod time/hash changed (indicating reprocessing)
-        // 6. Assert cache is updated correctly
+        $generator2 = $this->getGenerator(forceRebuild: true);
+        ob_start();
+        $generator2->generate();
+        $output = ob_get_clean();
+
+        // 5. Assert output indicates rebuild and generation (not skipping)
+        $this->assertStringContainsString('Cache will be rebuilt', $output, 'Generator should indicate cache rebuild.');
+        $this->assertStringContainsString("Generating documentation for {$sourcePath}", $output, 'Generator should re-generate the file on force rebuild.');
+        $this->assertStringNotContainsString('Skipping unchanged file', $output, 'Generator should not skip the file on force rebuild.');
+
+        // 6. Assert doc file content changed (indicating reprocessing)
+        $this->assertFileExists($docPath);
+        clearstatcache(); // Might not be strictly needed for content check, but good practice
+        $finalDocContent = file_get_contents($docPath); // Get final content
+        $this->assertNotEquals($initialDocContent, $finalDocContent, 'Doc file content should change on force rebuild due to mock timestamp.');
+
+        // 7. Assert cache is updated correctly (still contains the hash)
+        $this->assertFileExists($cachePath);
+        $cacheData2 = json_decode(file_get_contents($cachePath), true);
+        $this->assertEquals($fileHash, $cacheData2[$sourcePath] ?? null, 'Cache should still contain correct file hash after force rebuild.');
+        $this->assertArrayHasKey('_config_hash', $cacheData2, 'Cache should contain config hash after force rebuild.');
+        $this->assertCount(2, $cacheData2); // config hash + file hash
     }
 
     public function testCacheDefaultLocation(): void
