@@ -137,6 +137,18 @@ You can control caching via `config/docudoodle.php`:
 -   `--no-cache`: Disables caching for this run, forcing reprocessing of all files. This overrides the `use_cache` config setting.
 -   `--cache-path="/path/to/your/cache.json"`: Specifies a custom absolute path for the cache file for this run, overriding the `cache_file_path` config setting.
 
+**Building an Initial Cache:**
+
+If you have previously generated documentation without the caching feature enabled, you can run the following command to build an initial cache file based on your existing source files and their corresponding documentation files:
+
+```bash
+php artisan docudoodle:build-cache
+```
+
+This command scans your source directories, checks if a matching `.md` file exists in your output directory, and if so, calculates the hash of the source file and adds it to the cache. It uses your current configuration (`model`, `prompt_template`, etc.) to calculate the `_config_hash`.
+
+You can also use the `--source`, `--output`, and `--cache-path` options with this command if they differ from your configuration.
+
 ## Template Variables
 
 When creating custom prompt templates for documentation generation, you can use the following variables:
