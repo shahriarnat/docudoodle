@@ -110,7 +110,7 @@ You can publish the configuration file to your project using:
 php artisan vendor:publish --tag=docudoodle-config
 ```
 
-## Caching (New Feature)
+## Caching
 
 To improve performance and reduce API calls on subsequent runs, Docudoodle implements a caching mechanism.
 
