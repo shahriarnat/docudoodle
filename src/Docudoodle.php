@@ -1162,6 +1162,52 @@ class Docudoodle
             }
         }
         
+        // --- Start Orphan Cleanup ---
+        if ($this->useCache) {
+            $cachedFiles = array_keys(array_filter($this->hashMap, fn($key) => $key !== '_config_hash', ARRAY_FILTER_USE_KEY));
+            $orphans = array_diff($cachedFiles, $this->encounteredFiles);
+
+            if (!empty($orphans)) {
+                echo "Cleaning up documentation for deleted source files...\n";
+                $outputDirPrefixed = rtrim($this->outputDir, "/") . "/";
+
+                foreach ($orphans as $orphanSourcePath) {
+                    // Find the original base source directory for the orphan
+                    $baseSourceDir = null;
+                    foreach ($this->sourceDirs as $dir) {
+                        // Ensure consistent directory separators and trailing slash for comparison
+                        $normalizedDir = rtrim(str_replace('\\', '/', $dir), '/') . '/';
+                        $normalizedOrphanPath = str_replace('\\', '/', $orphanSourcePath);
+                        
+                        if (strpos($normalizedOrphanPath, $normalizedDir) === 0) {
+                            $baseSourceDir = $dir;
+                            break;
+                        }
+                    }
+
+                    if ($baseSourceDir) {
+                        $relPath = substr($orphanSourcePath, strlen(rtrim($baseSourceDir, '/')) + 1);
+                        $sourceDirName = basename(rtrim($baseSourceDir, "/"));
+                        $fullRelPath = $sourceDirName . "/" . $relPath;
+                        $relDir = dirname($fullRelPath);
+                        $fileName = pathinfo($relPath, PATHINFO_FILENAME);
+                        $docPath = $outputDirPrefixed . $relDir . "/" . $fileName . ".md";
+
+                        if (file_exists($docPath)) {
+                            echo "Deleting orphan documentation: {$docPath}\n";
+                            @unlink($docPath); // Use @ to suppress errors if deletion fails
+                        }
+                    } else {
+                        echo "Warning: Could not determine source directory for orphan path: {$orphanSourcePath}\n";
+                    }
+                    
+                    // Remove orphan from the hash map regardless
+                    unset($this->hashMap[$orphanSourcePath]);
+                }
+            }
+        }
+        // --- End Orphan Cleanup ---
+        
         // Make sure the index is fully up to date
         $this->finalizeDocumentationIndex();
 
