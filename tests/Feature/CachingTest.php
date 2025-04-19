@@ -230,15 +230,75 @@ class CachingTest extends TestCase
 
     public function testProcessesNewFiles(): void
     {
-        $this->markTestIncomplete('This test has not been implemented yet.');
+        // Define Mocks for curl functions
+        $curlExecMock = $this->getFunctionMock('Docudoodle', 'curl_exec');
+        $curlErrnoMock = $this->getFunctionMock('Docudoodle', 'curl_errno');
+        $curlErrorMock = $this->getFunctionMock('Docudoodle', 'curl_error');
+        $this->getFunctionMock('Docudoodle', 'curl_close')->expects($this->any());
+        $this->getFunctionMock('Docudoodle', 'curl_init')->expects($this->any())->willReturn(curl_init());
+        $this->getFunctionMock('Docudoodle', 'curl_setopt_array')->expects($this->any());
+
+        $mockApiResponse = json_encode([
+            'choices' => [
+                ['message' => ['content' => 'Mocked AI Response']]
+            ]
+        ]);
+        $curlExecMock->expects($this->atLeastOnce())->willReturn($mockApiResponse);
+        $curlErrnoMock->expects($this->any())->willReturn(0);
+        $curlErrorMock->expects($this->any())->willReturn('');
+
         // 1. Create source file A
-        // 2. Run generator
+        $sourcePathA = $this->createSourceFile('fileA.php', '<?php echo "File A v1";');
+        $docPathA = $this->tempOutputDir . '/' . basename($this->tempSourceDir) . '/fileA.md';
+        $cachePath = $this->tempCacheFile;
+        $hashA = sha1_file($sourcePathA);
+
+        // 2. Run generator (first run)
+        $generator1 = $this->getGenerator();
+        $generator1->generate();
+
         // 3. Assert doc A exists
+        $this->assertFileExists($docPathA, 'Doc A should exist after first run.');
+        $this->assertFileExists($cachePath, 'Cache should exist after first run.');
+        $initialDocAModTime = filemtime($docPathA);
+        $cacheData1 = json_decode(file_get_contents($cachePath), true);
+        $this->assertEquals($hashA, $cacheData1[$sourcePathA] ?? null, 'Cache should contain hash for file A.');
+        $this->assertCount(2, $cacheData1, 'Cache should have 2 entries (config + file A).'); // Config hash + File A
+
+        // Wait briefly
+        usleep(10000);
+
         // 4. Create source file B
+        $sourcePathB = $this->createSourceFile('fileB.php', '<?php echo "File B v1";');
+        $docPathB = $this->tempOutputDir . '/' . basename($this->tempSourceDir) . '/fileB.md';
+        $hashB = sha1_file($sourcePathB);
+
         // 5. Run generator again
+        $generator2 = $this->getGenerator();
+        // Capture output
+        ob_start();
+        $generator2->generate();
+        $output = ob_get_clean();
+
+        // Assert file A was skipped and file B was generated
+        $this->assertStringContainsString("Skipping unchanged file: {$sourcePathA}", $output, 'Generator should skip file A.');
+        $this->assertStringContainsString("Generating documentation for {$sourcePathB}", $output, 'Generator should generate file B.');
+
         // 6. Assert doc B exists
+        $this->assertFileExists($docPathB, 'Doc B should exist after second run.');
+
         // 7. Assert doc A was likely skipped (check mod time?)
+        clearstatcache();
+        $finalDocAModTime = filemtime($docPathA);
+        $this->assertEquals($initialDocAModTime, $finalDocAModTime, 'Doc A modification time should not change.');
+
         // 8. Assert cache contains both A and B
+        $this->assertFileExists($cachePath);
+        $cacheData2 = json_decode(file_get_contents($cachePath), true);
+        $this->assertEquals($hashA, $cacheData2[$sourcePathA] ?? null, 'Cache should still contain correct hash for file A.');
+        $this->assertEquals($hashB, $cacheData2[$sourcePathB] ?? null, 'Cache should now contain hash for file B.');
+        $this->assertCount(3, $cacheData2, 'Cache should have 3 entries (config + file A + file B).'); // Config hash + File A + File B
+        $this->assertEquals($cacheData1['_config_hash'] ?? null, $cacheData2['_config_hash'] ?? null, 'Config hash should not change.');
     }
 
     public function testOrphanCleanup(): void
