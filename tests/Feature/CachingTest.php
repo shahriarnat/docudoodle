@@ -68,7 +68,9 @@ class CachingTest extends TestCase
     private function getGenerator(
         bool $useCache = true, 
         ?string $cacheFilePath = null, 
-        bool $forceRebuild = false
+        bool $forceRebuild = false,
+        string $model = 'test-model',
+        string $promptTemplatePath = __DIR__ . '/../../resources/templates/default-prompt.md'
     ): Docudoodle // Return a real instance now
     {
         // Use a very simple model/API key for testing
@@ -76,14 +78,14 @@ class CachingTest extends TestCase
             openaiApiKey: 'test-key', 
             sourceDirs: [$this->tempSourceDir], 
             outputDir: $this->tempOutputDir, 
-            model: 'test-model', 
+            model: $model,
             maxTokens: 100,
             allowedExtensions: ['php'],
             skipSubdirectories: [],
             apiProvider: 'openai', // Assume basic provider for test structure
             ollamaHost: 'localhost',
             ollamaPort: 5000,
-            promptTemplate: __DIR__ . '/../../resources/templates/default-prompt.md', // Use default for now
+            promptTemplate: $promptTemplatePath,
             useCache: $useCache,
             cacheFilePath: $cacheFilePath ?? $this->tempCacheFile, // Pass explicitly
             forceRebuild: $forceRebuild
@@ -380,13 +382,76 @@ class CachingTest extends TestCase
 
     public function testConfigurationChangeInvalidation(): void
     {
-        $this->markTestIncomplete('This test has not been implemented yet.');
+        // Define Mocks for curl functions
+        $curlExecMock = $this->getFunctionMock('Docudoodle', 'curl_exec');
+        $curlErrnoMock = $this->getFunctionMock('Docudoodle', 'curl_errno');
+        $curlErrorMock = $this->getFunctionMock('Docudoodle', 'curl_error');
+        $this->getFunctionMock('Docudoodle', 'curl_close')->expects($this->any());
+        $this->getFunctionMock('Docudoodle', 'curl_init')->expects($this->any())->willReturn(curl_init());
+        $this->getFunctionMock('Docudoodle', 'curl_setopt_array')->expects($this->any());
+
+        $mockApiResponse = json_encode([
+            'choices' => [
+                ['message' => ['content' => 'Mocked AI Response']]
+            ]
+        ]);
+        $curlExecMock->expects($this->atLeastOnce())->willReturn($mockApiResponse);
+        $curlErrnoMock->expects($this->any())->willReturn(0);
+        $curlErrorMock->expects($this->any())->willReturn('');
+
         // 1. Create source file
-        // 2. Run generator with config X
-        // 3. Get doc file mod time/hash, cache config hash
-        // 4. Run generator again with config Y (e.g., different model)
-        // 5. Assert doc file mod time/hash changed (indicating reprocessing)
-        // 6. Assert cache config hash updated
+        $sourcePath = $this->createSourceFile('test.php', '<?php echo "Consistent Content";');
+        $docPath = $this->tempOutputDir . '/' . basename($this->tempSourceDir) . '/test.md';
+        $cachePath = $this->tempCacheFile;
+        $fileHash = sha1_file($sourcePath);
+
+        // 2. Run generator with config X (model-v1)
+        $generator1 = $this->getGenerator(model: 'model-v1');
+        ob_start(); // Capture initial output to check later
+        $generator1->generate();
+        ob_end_clean(); // Discard initial output for now
+
+        // 3. Get initial state
+        $this->assertFileExists($docPath, 'Doc file should exist after first run.');
+        $this->assertFileExists($cachePath, 'Cache file should exist after first run.');
+        $initialDocModTime = filemtime($docPath);
+        $cacheData1 = json_decode(file_get_contents($cachePath), true);
+        $initialConfigHash = $cacheData1['_config_hash'] ?? null;
+        $this->assertNotNull($initialConfigHash, 'Initial config hash should be set.');
+        $this->assertEquals($fileHash, $cacheData1[$sourcePath] ?? null, 'Initial cache should have file hash.');
+
+        // Wait briefly
+        usleep(10000);
+
+        // 4. Run generator again with config Y (model-v2)
+        // Pass a different model name to trigger config hash change
+        $generator2 = $this->getGenerator(model: 'model-v2'); 
+        ob_start();
+        $generator2->generate();
+        $output = ob_get_clean();
+
+        // 5. Assert output indicates invalidation and reprocessing
+        $this->assertStringContainsString('Configuration changed or cache invalidated', $output, 'Generator should indicate config change.');
+        $this->assertStringContainsString('Forcing full documentation rebuild', $output, 'Generator should indicate forcing rebuild.');
+        $this->assertStringContainsString("Generating documentation for {$sourcePath}", $output, 'Generator should re-generate the file.');
+        $this->assertStringNotContainsString('Skipping unchanged file', $output, 'Generator should not skip the file despite unchanged content.');
+
+        // 6. Assert doc file mod time/hash changed (indicating reprocessing)
+        $this->assertFileExists($docPath); // Still exists
+        clearstatcache();
+        $finalDocModTime = filemtime($docPath);
+        $this->assertGreaterThan($initialDocModTime, $finalDocModTime, 'Doc file modification time should update due to reprocessing.');
+
+        // 7. Assert cache config hash updated
+        $this->assertFileExists($cachePath);
+        $cacheData2 = json_decode(file_get_contents($cachePath), true);
+        $finalConfigHash = $cacheData2['_config_hash'] ?? null;
+        $this->assertNotNull($finalConfigHash, 'Final config hash should be set.');
+        $this->assertNotEquals($initialConfigHash, $finalConfigHash, 'Config hash should change after config modification.');
+
+        // 8. Assert file hash is still present (re-added after reprocessing)
+        $this->assertEquals($fileHash, $cacheData2[$sourcePath] ?? null, 'Cache should contain correct file hash after reprocessing.');
+        $this->assertCount(2, $cacheData2); // config hash + file hash
     }
 
     public function testForceRebuildFlag(): void
