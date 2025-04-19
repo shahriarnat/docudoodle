@@ -303,15 +303,79 @@ class CachingTest extends TestCase
 
     public function testOrphanCleanup(): void
     {
-        $this->markTestIncomplete('This test has not been implemented yet.');
+        // Define Mocks for curl functions
+        $curlExecMock = $this->getFunctionMock('Docudoodle', 'curl_exec');
+        $curlErrnoMock = $this->getFunctionMock('Docudoodle', 'curl_errno');
+        $curlErrorMock = $this->getFunctionMock('Docudoodle', 'curl_error');
+        $this->getFunctionMock('Docudoodle', 'curl_close')->expects($this->any());
+        $this->getFunctionMock('Docudoodle', 'curl_init')->expects($this->any())->willReturn(curl_init());
+        $this->getFunctionMock('Docudoodle', 'curl_setopt_array')->expects($this->any());
+
+        $mockApiResponse = json_encode([
+            'choices' => [
+                ['message' => ['content' => 'Mocked AI Response']]
+            ]
+        ]);
+        $curlExecMock->expects($this->atLeastOnce())->willReturn($mockApiResponse);
+        $curlErrnoMock->expects($this->any())->willReturn(0);
+        $curlErrorMock->expects($this->any())->willReturn('');
+
         // 1. Create source files A and B
+        $sourcePathA = $this->createSourceFile('fileA.php', '<?php echo "File A";');
+        $sourcePathB = $this->createSourceFile('fileB.php', '<?php echo "File B";');
+        $docPathA = $this->tempOutputDir . '/' . basename($this->tempSourceDir) . '/fileA.md';
+        $docPathB = $this->tempOutputDir . '/' . basename($this->tempSourceDir) . '/fileB.md';
+        $cachePath = $this->tempCacheFile;
+        $hashA = sha1_file($sourcePathA);
+        $hashB = sha1_file($sourcePathB);
+
         // 2. Run generator
+        $generator1 = $this->getGenerator();
+        $generator1->generate();
+
         // 3. Assert docs A and B exist, cache contains A and B
+        $this->assertFileExists($docPathA, 'Doc A should exist initially.');
+        $this->assertFileExists($docPathB, 'Doc B should exist initially.');
+        $this->assertFileExists($cachePath, 'Cache should exist initially.');
+        $cacheData1 = json_decode(file_get_contents($cachePath), true);
+        $this->assertArrayHasKey($sourcePathA, $cacheData1);
+        $this->assertArrayHasKey($sourcePathB, $cacheData1);
+        $this->assertEquals($hashA, $cacheData1[$sourcePathA]);
+        $this->assertEquals($hashB, $cacheData1[$sourcePathB]);
+        $this->assertCount(3, $cacheData1); // config + A + B
+
         // 4. Delete source file A
+        unlink($sourcePathA);
+        $this->assertFileDoesNotExist($sourcePathA, 'Source file A should be deleted.');
+
+        // Wait briefly
+        usleep(10000);
+
         // 5. Run generator again
+        $generator2 = $this->getGenerator();
+        ob_start();
+        $generator2->generate();
+        $output = ob_get_clean();
+
+        // 7. Assert output indicates cleanup and deletion
+        $this->assertStringContainsString('Cleaning up documentation for deleted source files', $output, 'Generator should mention cleanup.');
+        $this->assertStringContainsString("Deleting orphan documentation: {$docPathA}", $output, 'Generator should mention deleting orphan doc A.');
+        $this->assertStringContainsString("Skipping unchanged file: {$sourcePathB}", $output, 'Generator should skip file B.');
+
         // 6. Assert doc A does not exist
-        // 7. Assert doc B still exists
-        // 8. Assert cache contains only B
+        $this->assertFileDoesNotExist($docPathA, 'Doc A should be deleted after cleanup.');
+
+        // 8. Assert doc B still exists
+        $this->assertFileExists($docPathB, 'Doc B should still exist.');
+
+        // 9. Assert cache contains only B
+        $this->assertFileExists($cachePath, 'Cache should still exist.');
+        $cacheData2 = json_decode(file_get_contents($cachePath), true);
+        $this->assertArrayNotHasKey($sourcePathA, $cacheData2, 'Cache should not contain file A after cleanup.');
+        $this->assertArrayHasKey($sourcePathB, $cacheData2, 'Cache should still contain file B.');
+        $this->assertEquals($hashB, $cacheData2[$sourcePathB], 'Cache should have correct hash for file B.');
+        $this->assertCount(2, $cacheData2, 'Cache should have 2 entries (config + file B).'); // config + B
+        $this->assertEquals($cacheData1['_config_hash'] ?? null, $cacheData2['_config_hash'] ?? null, 'Config hash should not change during orphan cleanup.');
     }
 
     public function testConfigurationChangeInvalidation(): void
