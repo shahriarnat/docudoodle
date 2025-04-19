@@ -19,7 +19,9 @@ class GenerateDocsCommand extends Command
                             {--max-tokens= : Maximum tokens for API calls (default: from config or 10000)}
                             {--extensions=* : File extensions to process (default: from config or php, yaml, yml)}
                             {--skip=* : Subdirectories to skip (default: from config or vendor/, node_modules/, tests/, cache/)}
-                            {--api-provider= : API provider to use (default: from config or openai)}';
+                            {--api-provider= : API provider to use (default: from config or openai)}
+                            {--cache-path= : Path to the cache file (overrides config)}
+                            {--no-cache : Disable caching and force rebuild}';
 
     /**
      * The console command description.
@@ -104,6 +106,17 @@ class GenerateDocsCommand extends Command
         $this->info('Output directory: ' . $outputDir);
         $this->info('API provider: ' . $apiProvider);
         
+        // Determine cache settings
+        $forceRebuild = $this->option('no-cache');
+        $useCache = $forceRebuild ? false : config('docudoodle.use_cache', true);
+        $cachePath = $this->option('cache-path') ?: config('docudoodle.cache_file_path', null);
+
+        if ($useCache) {
+            $this->info('Cache enabled.' . ($cachePath ? " Path: {$cachePath}" : ' Path: Default in output dir'));
+        } else {
+            $this->info('Cache disabled.' . ($forceRebuild ? ' (Forced rebuild)' : ''));
+        }
+        
         try {
             $generator = new Docudoodle(
                 $apiKey,
@@ -115,7 +128,10 @@ class GenerateDocsCommand extends Command
                 $skipSubdirs,
                 $apiProvider,
                 $ollamaHost,
-                $ollamaPort
+                $ollamaPort,
+                $useCache,
+                $cachePath,
+                $forceRebuild
             );
             
             $generator->generate();

@@ -30,6 +30,9 @@ class Docudoodle
      * @param string $ollamaHost Ollama host (default: 'localhost')
      * @param int $ollamaPort Ollama port (default: 5000)
      * @param string $promptTemplate Path to prompt template markdown file
+     * @param bool $useCache Whether to use the caching mechanism
+     * @param ?string $cacheFilePath Specific path to the cache file (null for default)
+     * @param bool $forceRebuild Force regeneration ignoring cache
      */
     public function __construct(
         private string $openaiApiKey = "",
@@ -47,8 +50,25 @@ class Docudoodle
         private string $apiProvider = "openai",
         private string $ollamaHost = "localhost",
         private int $ollamaPort = 5000,
-        private string $promptTemplate = __DIR__ . "/../resources/templates/default-prompt.md"
+        private string $promptTemplate = __DIR__ . "/../resources/templates/default-prompt.md",
+        bool $useCache = true,
+        ?string $cacheFilePath = null,
+        private bool $forceRebuild = false
     ) {
+        // Assign properties
+        $this->useCache = $useCache;
+
+        // Determine final cache file path
+        if ($useCache) {
+            if (!empty($cacheFilePath)) {
+                $this->cacheFilePath = $cacheFilePath;
+            } else {
+                // Default to .docudoodle_cache.json inside output directory
+                $this->cacheFilePath = rtrim($this->outputDir, '/') . '/.docudoodle_cache.json';
+            }
+        } else {
+            $this->cacheFilePath = null; // Ensure path is null if caching is disabled
+        }
     }
 
     /**
@@ -1210,6 +1230,11 @@ class Docudoodle
         
         // Make sure the index is fully up to date
         $this->finalizeDocumentationIndex();
+
+        // Save the updated hash map if caching is enabled
+        if ($this->useCache) {
+            $this->saveHashMap($this->hashMap);
+        }
 
         echo "\nDocumentation generation complete! Files are available in the '{$this->outputDir}' directory.\n";
     }
