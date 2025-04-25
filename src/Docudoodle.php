@@ -58,7 +58,7 @@ class Docudoodle
         private string $promptTemplate = __DIR__ . "/../resources/templates/default-prompt.md",
         private bool $useCache = true,
         private ?string $cacheFilePath = null,
-        private bool $forceRebuild = false
+        private bool $forceRebuild = false,
         private string $azureEndpoint = "",
         private string $azureDeployment = "",
         private string $azureApiVersion = "2023-05-15"
