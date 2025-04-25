@@ -1231,7 +1231,7 @@ class Docudoodle
 
         // Process each source directory
         foreach ($this->sourceDirs as $sourceDir) {
-            if (file.exists($sourceDir)) {
+            if (file_exists($sourceDir)) {
                 echo "Processing directory: {$sourceDir}\n";
                 $this->processDirectory($sourceDir);
             } else {
