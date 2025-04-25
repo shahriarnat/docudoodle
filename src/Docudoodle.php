@@ -33,6 +33,11 @@ class Docudoodle
      * @param bool $useCache Whether to use the caching mechanism
      * @param ?string $cacheFilePath Specific path to the cache file (null for default)
      * @param bool $forceRebuild Force regeneration ignoring cache
+
+     * @param string $azureEndpoint Azure OpenAI endpoint URL (default: "")
+     * @param string $azureDeployment Azure OpenAI deployment ID (default: "")
+     * @param string $azureApiVersion Azure OpenAI API version (default: "2023-05-15")
+
      */
     public function __construct(
         private string $openaiApiKey = "",
@@ -54,6 +59,10 @@ class Docudoodle
         private bool $useCache = true,
         private ?string $cacheFilePath = null,
         private bool $forceRebuild = false
+        private string $azureEndpoint = "",
+        private string $azureDeployment = "",
+        private string $azureApiVersion = "2023-05-15"
+
     ) {
         // Ensure the cache file path is set if using cache and no specific path is provided
         if ($this->useCache && empty($this->cacheFilePath)) {
@@ -181,6 +190,8 @@ class Docudoodle
             return $this->generateDocumentationWithClaude($filePath, $content, $fileContext);
         } elseif ($this->apiProvider === "gemini") {
             return $this->generateDocumentationWithGemini($filePath, $content, $fileContext);
+        } elseif ($this->apiProvider === "azure") {
+            return $this->generateDocumentationWithAzureOpenAI($filePath, $content, $fileContext);
         } else {
             return $this->generateDocumentationWithOpenAI($filePath, $content, $fileContext);
         }
@@ -633,6 +644,65 @@ class Docudoodle
                 return $responseData["choices"][0]["message"]["content"];
             } else {
                 throw new Exception("Unexpected API response format");
+            }
+        } catch (Exception $e) {
+            return "# Documentation Generation Error\n\nThere was an error generating documentation for this file: " .
+                $e->getMessage();
+        }
+    }
+
+    /**
+     * Generate documentation using Azure OpenAI API
+     */
+    private function generateDocumentationWithAzureOpenAI($filePath, $content, $context = []): string
+    {
+        try {
+            // Check content length and truncate if necessary
+            if (strlen($content) > $this->maxTokens * 4) {
+                // Rough estimate of token count
+                $content =
+                    substr($content, 0, $this->maxTokens * 4) .
+                    "\n...(truncated for length)...";
+            }
+
+            $prompt = $this->loadPromptTemplate($filePath, $content, $context);
+
+            $postData = [
+                "messages" => [
+                    [
+                        "role" => "system",
+                        "content" => "You are a technical documentation specialist with expertise in PHP applications.",
+                    ],
+                    ["role" => "user", "content" => $prompt],
+                ],
+                "max_tokens" => 1500,
+            ];
+
+            // Azure OpenAI API requires a different endpoint format and authentication method
+            $endpoint = rtrim($this->azureEndpoint, '/');
+            $url = "{$endpoint}/openai/deployments/{$this->azureDeployment}/chat/completions?api-version={$this->azureApiVersion}";
+            
+            $ch = curl_init($url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($postData));
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                "Content-Type: application/json",
+                "api-key: " . $this->openaiApiKey,
+            ]);
+
+            $response = curl_exec($ch);
+            if (curl_errno($ch)) {
+                throw new Exception(curl_error($ch));
+            }
+            curl_close($ch);
+
+            $responseData = json_decode($response, true);
+
+            if (isset($responseData["choices"][0]["message"]["content"])) {
+                return $responseData["choices"][0]["message"]["content"];
+            } else {
+                throw new Exception("Unexpected Azure OpenAI API response format: " . json_encode($responseData));
             }
         } catch (Exception $e) {
             return "# Documentation Generation Error\n\nThere was an error generating documentation for this file: " .

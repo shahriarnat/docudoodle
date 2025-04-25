@@ -22,7 +22,11 @@ class GenerateDocsCommand extends Command
                             {--api-provider= : API provider to use (default: from config or openai)}
                             {--cache-path= : Path to the cache file (overrides config)}
                             {--no-cache : Disable caching completely}
-                            {--bypass-cache : Force regeneration of all documents ignoring cache}';
+                            {--bypass-cache : Force regeneration of all documents ignoring cache}
+                            {--azure-endpoint= : Azure OpenAI endpoint (default: from config)}
+                            {--azure-deployment= : Azure OpenAI deployment ID (default: from config)}
+                            {--azure-api-version= : Azure OpenAI API version (default: from config or 2023-05-15)}';
+
 
     /**
      * The console command description.
@@ -57,6 +61,12 @@ class GenerateDocsCommand extends Command
                 $this->error('Oops! Gemini API key is not set in the configuration!');
                 return 1;
             }
+        } elseif ($apiProvider === 'azure') {
+            $apiKey = config('docudoodle.azure_api_key');
+            if (empty($apiKey)) {
+                $this->error('Oops! Azure OpenAI API key is not set in the configuration!');
+                return 1;
+            }
         }
 
         // Parse command options with config fallbacks
@@ -89,11 +99,28 @@ class GenerateDocsCommand extends Command
 
         $skipSubdirs = $this->option('skip');
         if (empty($skipSubdirs)) {
-            $skipSubdirs = config('docudoodle.skip_subdirs', ['vendor/', 'node_modules/', 'tests/', 'cache/']);
+            $skipSubdirs = config('docudoodle.default_skip_dirs', ['vendor/', 'node_modules/', 'tests/', 'cache/']);
         }
 
         $ollamaHost = config('docudoodle.ollama_host', 'localhost');
         $ollamaPort = config('docudoodle.ollama_port', 5000);
+
+        
+        // Azure OpenAI specific configuration
+        $azureEndpoint = $this->option('azure-endpoint');
+        $azureDeployment = $this->option('azure-deployment');
+        $azureApiVersion = $this->option('azure-api-version');
+        
+        if (empty($azureEndpoint)) {
+            $azureEndpoint = config('docudoodle.azure_endpoint', '');
+        }
+        if (empty($azureDeployment)) {
+            $azureDeployment = config('docudoodle.azure_deployment', '');
+        }
+        if (empty($azureApiVersion)) {
+            $azureApiVersion = config('docudoodle.azure_api_version', '2023-05-15');
+        }
+        
 
         // Convert relative paths to absolute paths based on Laravel's base path
         $sourceDirs = array_map(function($dir) {
@@ -136,9 +163,13 @@ class GenerateDocsCommand extends Command
                 apiProvider: $apiProvider,
                 ollamaHost: $ollamaHost,
                 ollamaPort: $ollamaPort,
+                promptTemplate: __DIR__.'/../../resources/templates/default-prompt.md',
                 useCache: $useCache,
                 cacheFilePath: $cachePath,
                 forceRebuild: $bypassCache
+                azureEndpoint: $azureEndpoint,
+                azureDeployment: $azureDeployment,
+                azureApiVersion: $azureApiVersion
             );
 
             $generator->generate();
