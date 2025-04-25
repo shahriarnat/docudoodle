@@ -20,9 +20,13 @@ class GenerateDocsCommand extends Command
                             {--extensions=* : File extensions to process (default: from config or php, yaml, yml)}
                             {--skip=* : Subdirectories to skip (default: from config or vendor/, node_modules/, tests/, cache/)}
                             {--api-provider= : API provider to use (default: from config or openai)}
+                            {--cache-path= : Path to the cache file (overrides config)}
+                            {--no-cache : Disable caching completely}
+                            {--bypass-cache : Force regeneration of all documents ignoring cache}
                             {--azure-endpoint= : Azure OpenAI endpoint (default: from config)}
                             {--azure-deployment= : Azure OpenAI deployment ID (default: from config)}
                             {--azure-api-version= : Azure OpenAI API version (default: from config or 2023-05-15)}';
+
 
     /**
      * The console command description.
@@ -38,7 +42,7 @@ class GenerateDocsCommand extends Command
     {
         $apiProvider = $this->option('api-provider') ?: config('docudoodle.default_api_provider', 'openai');
         $apiKey = '';
-        
+
         if ($apiProvider === 'openai') {
             $apiKey = config('docudoodle.openai_api_key');
             if (empty($apiKey)) {
@@ -64,35 +68,35 @@ class GenerateDocsCommand extends Command
                 return 1;
             }
         }
-        
+
         // Parse command options with config fallbacks
         $sourceDirs = $this->option('source');
         if (empty($sourceDirs)) {
             $sourceDirs = config('docudoodle.source_dirs', ['app/', 'config/', 'routes/', 'database/']);
         }
-        
+
         $outputDir = $this->option('output');
         if (empty($outputDir)) {
             $outputDir = config('docudoodle.output_dir', 'documentation');
         }
-        
+
         $model = $this->option('model');
         if (empty($model)) {
             $model = config('docudoodle.default_model', 'gpt-4o-mini');
         }
-        
+
         $maxTokens = $this->option('max-tokens');
         if (empty($maxTokens)) {
             $maxTokens = (int) config('docudoodle.max_tokens', 10000);
         } else {
             $maxTokens = (int) $maxTokens;
         }
-        
+
         $extensions = $this->option('extensions');
         if (empty($extensions)) {
             $extensions = config('docudoodle.extensions', ['php', 'yaml', 'yml']);
         }
-        
+
         $skipSubdirs = $this->option('skip');
         if (empty($skipSubdirs)) {
             $skipSubdirs = config('docudoodle.default_skip_dirs', ['vendor/', 'node_modules/', 'tests/', 'cache/']);
@@ -100,6 +104,7 @@ class GenerateDocsCommand extends Command
 
         $ollamaHost = config('docudoodle.ollama_host', 'localhost');
         $ollamaPort = config('docudoodle.ollama_port', 5000);
+
         
         // Azure OpenAI specific configuration
         $azureEndpoint = $this->option('azure-endpoint');
@@ -116,38 +121,59 @@ class GenerateDocsCommand extends Command
             $azureApiVersion = config('docudoodle.azure_api_version', '2023-05-15');
         }
         
+
         // Convert relative paths to absolute paths based on Laravel's base path
         $sourceDirs = array_map(function($dir) {
             return base_path($dir);
         }, $sourceDirs);
-        
+
         $outputDir = base_path($outputDir);
-        
+
         $this->info('Starting documentation generation...');
         $this->info('Source directories: ' . implode(', ', $sourceDirs));
         $this->info('Output directory: ' . $outputDir);
         $this->info('API provider: ' . $apiProvider);
-        
+
+        // Determine cache settings
+        $useCache = !$this->option('no-cache') && config('docudoodle.use_cache', true);
+        $bypassCache = $this->option('bypass-cache');
+
+        $cachePath = $this->option('cache-path');
+        if (empty($cachePath)) {
+            $cachePath = config('docudoodle.cache_file_path', null);
+        } 
+        if ($useCache) {
+            $this->info('Cache enabled.' . ($cachePath ? " Path: {$cachePath}" : ' Using default path'));
+            if ($bypassCache) {
+                $this->info('Bypass cache flag set: Documents will be regenerated but cache will be updated.');
+            }
+        } else {
+            $this->info('Cache disabled.' . ($this->option('no-cache') ? ' (--no-cache option)' : ' (from config)'));
+        }
+
         try {
             $generator = new Docudoodle(
-                $apiKey,
-                $sourceDirs,
-                $outputDir,
-                $model,
-                $maxTokens,
-                $extensions,
-                $skipSubdirs,
-                $apiProvider,
-                $ollamaHost,
-                $ollamaPort,
-                __DIR__.'/../../resources/templates/default-prompt.md',
-                $azureEndpoint,
-                $azureDeployment,
-                $azureApiVersion
+                openaiApiKey: $apiKey,
+                sourceDirs: $sourceDirs,
+                outputDir: $outputDir,
+                model: $model,
+                maxTokens: $maxTokens,
+                allowedExtensions: $extensions,
+                skipSubdirectories: $skipSubdirs,
+                apiProvider: $apiProvider,
+                ollamaHost: $ollamaHost,
+                ollamaPort: $ollamaPort,
+                promptTemplate: __DIR__.'/../../resources/templates/default-prompt.md',
+                useCache: $useCache,
+                cacheFilePath: $cachePath,
+                forceRebuild: $bypassCache
+                azureEndpoint: $azureEndpoint,
+                azureDeployment: $azureDeployment,
+                azureApiVersion: $azureApiVersion
             );
-            
+
             $generator->generate();
-            
+
             $this->info('Documentation generated successfully!');
             return 0;
         } catch (\Exception $e) {
