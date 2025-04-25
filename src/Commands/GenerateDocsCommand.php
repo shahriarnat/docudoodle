@@ -95,7 +95,7 @@ class GenerateDocsCommand extends Command
         
         $skipSubdirs = $this->option('skip');
         if (empty($skipSubdirs)) {
-            $skipSubdirs = config('docudoodle.skip_subdirs', ['vendor/', 'node_modules/', 'tests/', 'cache/']);
+            $skipSubdirs = config('docudoodle.default_skip_dirs', ['vendor/', 'node_modules/', 'tests/', 'cache/']);
         }
 
         $ollamaHost = config('docudoodle.ollama_host', 'localhost');
