@@ -523,6 +523,7 @@ class Docudoodle
             ];
 
             return str_replace(array_keys($variables), array_values($variables), $template);
+
         } catch (Exception $e) {
             // If template loading fails, return a basic default prompt
             return "Please document the PHP file {$filePath}. Here's the content:\n\n```\n{$content}\n```";
@@ -823,14 +824,14 @@ class Docudoodle
     /**
      * Create documentation file for a given source file
      */
-    private function createDocumentationFile($sourcePath, $relPath, $sourceDir): void
+    private function createDocumentationFile($sourcePath, $relPath, $sourceDir): bool
     {
         // Check cache first if enabled
         if ($this->useCache && !$this->forceRebuild) {
             $currentHash = $this->calculateFileHash($sourcePath);
             if ($currentHash !== false && isset($this->hashMap[$sourcePath]) && $this->hashMap[$sourcePath] === $currentHash) {
                 echo "Skipping unchanged file: {$sourcePath}\n";
-                return;
+                return false; // File was unchanged and skipped
             }
         }
 
@@ -853,7 +854,7 @@ class Docudoodle
 
         // Check if file is valid for processing
         if (!$this->shouldProcessFile($sourcePath)) {
-            return;
+            return false;
         }
 
         // Read content
@@ -877,7 +878,7 @@ class Docudoodle
 
         // Update the hash map if caching is enabled
         if ($this->useCache) {
-            $currentHash = $this->calculateFileHash($sourcePath); // Recalculate in case file changed during processing?
+            $currentHash = $this->calculateFileHash($sourcePath); 
             if ($currentHash !== false) {
                 $this->hashMap[$sourcePath] = $currentHash;
             }
@@ -891,6 +892,8 @@ class Docudoodle
 
         // Add the encountered file path to the encounteredFiles array
         $this->encounteredFiles[] = $sourcePath;
+        
+        return true; // File was processed
     }
 
     /**
@@ -1158,7 +1161,7 @@ class Docudoodle
 
         // Process each source directory
         foreach ($this->sourceDirs as $sourceDir) {
-            if (file_exists($sourceDir)) {
+            if (file.exists($sourceDir)) {
                 echo "Processing directory: {$sourceDir}\n";
                 $this->processDirectory($sourceDir);
             } else {

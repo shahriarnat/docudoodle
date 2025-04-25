@@ -21,7 +21,8 @@ class GenerateDocsCommand extends Command
                             {--skip=* : Subdirectories to skip (default: from config or vendor/, node_modules/, tests/, cache/)}
                             {--api-provider= : API provider to use (default: from config or openai)}
                             {--cache-path= : Path to the cache file (overrides config)}
-                            {--no-cache : Disable caching and force rebuild}';
+                            {--no-cache : Disable caching completely}
+                            {--bypass-cache : Force regeneration of all documents ignoring cache}';
 
     /**
      * The console command description.
@@ -107,17 +108,20 @@ class GenerateDocsCommand extends Command
         $this->info('API provider: ' . $apiProvider);
 
         // Determine cache settings
-        $forceRebuild = $this->option('no-cache');
-        $useCache = $forceRebuild ? false : config('docudoodle.use_cache', true);
+        $useCache = !$this->option('no-cache') && config('docudoodle.use_cache', true);
+        $bypassCache = $this->option('bypass-cache');
 
         $cachePath = $this->option('cache-path');
         if (empty($cachePath)) {
-            $cachePath = config('docudoodle.cache_file_path', $outputDir . '/.docudoodle_cache.json');
+            $cachePath = config('docudoodle.cache_file_path', null);
         } 
         if ($useCache) {
-            $this->info('Cache enabled.' . ($cachePath ? " Path: {$cachePath}" : ' Path: Default in output dir'));
+            $this->info('Cache enabled.' . ($cachePath ? " Path: {$cachePath}" : ' Using default path'));
+            if ($bypassCache) {
+                $this->info('Bypass cache flag set: Documents will be regenerated but cache will be updated.');
+            }
         } else {
-            $this->info('Cache disabled.' . ($forceRebuild ? ' (Forced rebuild)' : ''));
+            $this->info('Cache disabled.' . ($this->option('no-cache') ? ' (--no-cache option)' : ' (from config)'));
         }
 
         try {
@@ -134,7 +138,7 @@ class GenerateDocsCommand extends Command
                 ollamaPort: $ollamaPort,
                 useCache: $useCache,
                 cacheFilePath: $cachePath,
-                forceRebuild: $forceRebuild
+                forceRebuild: $bypassCache
             );
 
             $generator->generate();
