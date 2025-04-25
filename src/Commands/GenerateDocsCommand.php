@@ -166,7 +166,7 @@ class GenerateDocsCommand extends Command
                 promptTemplate: __DIR__.'/../../resources/templates/default-prompt.md',
                 useCache: $useCache,
                 cacheFilePath: $cachePath,
-                forceRebuild: $bypassCache
+                forceRebuild: $bypassCache,
                 azureEndpoint: $azureEndpoint,
                 azureDeployment: $azureDeployment,
                 azureApiVersion: $azureApiVersion
