@@ -77,12 +77,14 @@ Set your Claude API key here or in your `.env` file as `CLAUDE_API_KEY`.
 Set your Gemini API key here or in your `.env` file as `GEMINI_API_KEY`.
 
 ### Azure OpenAI Settings
+
 ```php
 'azure_endpoint' => env('AZURE_OPENAI_ENDPOINT', ''),
 'azure_api_key' => env('AZURE_OPENAI_API_KEY', ''),
 'azure_deployment' => env('AZURE_OPENAI_DEPLOYMENT', ''),
 'azure_api_version' => env('AZURE_OPENAI_API_VERSION', '2023-05-15'),
 ```
+
 Configure Azure OpenAI integration. You need to provide the endpoint URL, API key, deployment ID, and optionally the API version if using Azure as your API provider.
 
 ### Model Selection
@@ -216,13 +218,11 @@ Focus on explaining what this file does in simple terms.
 
 ````
 
-Then specify the custom template path when initializing Docudoodle:
+Then specify the custom template path in your `.env` file:
 
-```php
-$docudoodle = new Docudoodle(
-    promptTemplate: '/path/to/your/custom-template.md'
-);
-````
+```
+DOCUDOODLE_PROMPT_TEMPLATE=./path/to/template.md
+```
 
 ## Using Azure OpenAI
 
@@ -267,3 +267,4 @@ This project is licensed under the MIT License. Check out the LICENSE file for a
 ## Contributing
 
 We'd love your help making Docudoodle even better! Feel free to submit a pull request or open an issue for any enhancements or bug fixes. Everyone's welcome! 🎉
+````
