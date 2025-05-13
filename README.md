@@ -214,10 +214,6 @@ Here's the code:
 ```
 ````
 
-Focus on explaining what this file does in simple terms.
-
-````
-
 Then specify the custom template path in your `.env` file:
 
 ```
@@ -250,8 +246,6 @@ php artisan docudoodle:generate --api-provider=azure --azure-endpoint=https://yo
 ```
 
 ## Documentation Output Options
-
-### File System Output
 
 By default, Docudoodle generates documentation in Markdown format in your specified output directory.
 
@@ -307,7 +301,7 @@ composer require guzzlehttp/guzzle:^7.0
 
 ### Command Options
 
-```bash
+```
 php artisan docudoodle:generate
     --jira              # Enable Jira documentation output
     --confluence        # Enable Confluence documentation output
@@ -316,7 +310,7 @@ php artisan docudoodle:generate
 
 You can combine these options as needed. For example, to generate documentation in both Jira and Confluence but not in the file system:
 
-```bash
+```
 php artisan docudoodle:generate --jira --confluence --no-files
 ```
 
@@ -341,4 +335,3 @@ This project is licensed under the MIT License. Check out the LICENSE file for a
 ## Contributing
 
 We'd love your help making Docudoodle even better! Feel free to submit a pull request or open an issue for any enhancements or bug fixes. Everyone's welcome! 🎉
-````
