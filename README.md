@@ -13,6 +13,36 @@ Docudoodle writes Markdown files which show up great in Github and other source 
 
 Better yet, Docudoodle skips already existing documentation files. Allowing a quick top-up run after you have concluded a feature, meaning that the entire process of getting good documentation written is a thing of the past 🚀
 
+## Table of Contents
+
+- [Examples](#examples)
+- [Features](#features)
+- [Installation](#installation)
+- [Usage](#usage)
+- [Configuration](#configuration)
+  - [OpenAI API Key](#openai-api-key)
+  - [Claude API Key](#claude-api-key)
+  - [Gemini API Key](#gemini-api-key)
+  - [Azure OpenAI Settings](#azure-openai-settings)
+  - [Model Selection](#model-selection)
+  - [API Provider](#api-provider)
+  - [Ollama Configuration](#ollama-configuration)
+  - [Token Limits](#token-limits)
+  - [File Extensions](#file-extensions)
+  - [Skip Directories](#skip-directories)
+- [Caching](#caching)
+- [Template Variables](#template-variables)
+- [Custom Template Example](#custom-template-example)
+- [Using Azure OpenAI](#using-azure-openai)
+- [Documentation Output Options](#documentation-output-options)
+  - [Jira Integration](#jira-integration)
+  - [Confluence Integration](#confluence-integration)
+  - [Dependencies](#dependencies)
+  - [Command Options](#command-options)
+- [Running Tests](#running-tests)
+- [License](#license)
+- [Contributing](#contributing)
+
 ## Examples
 
 If you want to see what the output of some documentation looks like, check out the [examples folder](https://github.com/genericmilk/docudoodle/tree/main/examples) in this repo which contains a few examples 🥰
