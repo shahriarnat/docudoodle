@@ -180,4 +180,14 @@ return [
     'use_cache' => env('DOCUDOODLE_USE_CACHE', true),
     'cache_file_path' => env('DOCUDOODLE_CACHE_PATH', null),
     'bypass_cache' => env('DOCUDOODLE_BYPASS_CACHE', false),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Prompt Template
+    |--------------------------------------------------------------------------
+    |
+    | The path to the prompt template file.
+    |
+    */
+    'prompt_template' => env('DOCUDOODLE_PROMPT_TEMPLATE', __DIR__.'/../../resources/templates/default-prompt.md'),
 ];

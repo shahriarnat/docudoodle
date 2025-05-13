@@ -218,13 +218,11 @@ Focus on explaining what this file does in simple terms.
 
 ````
 
-Then specify the custom template path when initializing Docudoodle:
+Then specify the custom template path in your `.env` file:
 
-```php
-$docudoodle = new Docudoodle(
-    promptTemplate: '/path/to/your/custom-template.md'
-);
-````
+```
+DOCUDOODLE_PROMPT_TEMPLATE=./path/to/template.md
+```
 
 ## Using Azure OpenAI
 
@@ -343,3 +341,4 @@ This project is licensed under the MIT License. Check out the LICENSE file for a
 ## Contributing
 
 We'd love your help making Docudoodle even better! Feel free to submit a pull request or open an issue for any enhancements or bug fixes. Everyone's welcome! 🎉
+````
