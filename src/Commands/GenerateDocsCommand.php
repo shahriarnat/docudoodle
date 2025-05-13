@@ -25,7 +25,10 @@ class GenerateDocsCommand extends Command
                             {--bypass-cache : Force regeneration of all documents ignoring cache}
                             {--azure-endpoint= : Azure OpenAI endpoint (default: from config)}
                             {--azure-deployment= : Azure OpenAI deployment ID (default: from config)}
-                            {--azure-api-version= : Azure OpenAI API version (default: from config or 2023-05-15)}';
+                            {--azure-api-version= : Azure OpenAI API version (default: from config or 2023-05-15)}
+                            {--jira : Enable Jira documentation}
+                            {--confluence : Enable Confluence documentation}
+                            {--no-files : Disable file system documentation output}';
 
 
     /**
@@ -122,6 +125,51 @@ class GenerateDocsCommand extends Command
         }
         
 
+        // Handle Jira configuration
+        $jiraConfig = [];
+        if ($this->option('jira')) {
+            $jiraConfig = [
+                'enabled' => true,
+                'host' => config('docudoodle.jira.host'),
+                'api_token' => config('docudoodle.jira.api_token'),
+                'email' => config('docudoodle.jira.email'),
+                'project_key' => config('docudoodle.jira.project_key'),
+                'issue_type' => config('docudoodle.jira.issue_type'),
+            ];
+
+            // Validate Jira configuration
+            if (empty($jiraConfig['host']) || empty($jiraConfig['api_token']) || 
+                empty($jiraConfig['email']) || empty($jiraConfig['project_key'])) {
+                $this->error('Jira integration is enabled but configuration is incomplete. Please check your .env file.');
+                return 1;
+            }
+        }
+
+        // Handle Confluence configuration
+        $confluenceConfig = [];
+        if ($this->option('confluence')) {
+            $confluenceConfig = [
+                'enabled' => true,
+                'host' => config('docudoodle.confluence.host'),
+                'api_token' => config('docudoodle.confluence.api_token'),
+                'email' => config('docudoodle.confluence.email'),
+                'space_key' => config('docudoodle.confluence.space_key'),
+                'parent_page_id' => config('docudoodle.confluence.parent_page_id'),
+            ];
+
+            // Validate Confluence configuration
+            if (empty($confluenceConfig['host']) || empty($confluenceConfig['api_token']) || 
+                empty($confluenceConfig['email']) || empty($confluenceConfig['space_key'])) {
+                $this->error('Confluence integration is enabled but configuration is incomplete. Please check your .env file.');
+                return 1;
+            }
+        }
+
+        // Set output directory to 'none' if --no-files is specified
+        if ($this->option('no-files')) {
+            $outputDir = 'none';
+        }
+
         // Convert relative paths to absolute paths based on Laravel's base path
         $sourceDirs = array_map(function($dir) {
             return base_path($dir);
@@ -169,7 +217,9 @@ class GenerateDocsCommand extends Command
                 forceRebuild: $bypassCache,
                 azureEndpoint: $azureEndpoint,
                 azureDeployment: $azureDeployment,
-                azureApiVersion: $azureApiVersion
+                azureApiVersion: $azureApiVersion,
+                jiraConfig: $jiraConfig,
+                confluenceConfig: $confluenceConfig
             );
 
             $generator->generate();

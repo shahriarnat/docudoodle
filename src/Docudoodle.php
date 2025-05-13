@@ -16,6 +16,12 @@ use ReflectionFunction;
  */
 class Docudoodle
 {
+    /** @var \Docudoodle\Services\JiraDocumentationService|null */
+    private $jiraService = null;
+
+    /** @var \Docudoodle\Services\ConfluenceDocumentationService|null */
+    private $confluenceService = null;
+
     /**
      * Constructor for Docudoodle
      *
@@ -61,12 +67,23 @@ class Docudoodle
         private bool $forceRebuild = false,
         private string $azureEndpoint = "",
         private string $azureDeployment = "",
-        private string $azureApiVersion = "2023-05-15"
-
+        private string $azureApiVersion = "2023-05-15",
+        private array $jiraConfig = [],
+        private array $confluenceConfig = []
     ) {
         // Ensure the cache file path is set if using cache and no specific path is provided
         if ($this->useCache && empty($this->cacheFilePath)) {
             $this->cacheFilePath = rtrim($this->outputDir, '/') . '/.docudoodle_cache.json';
+        }
+
+        // Initialize Jira service if enabled
+        if (!empty($jiraConfig) && $jiraConfig['enabled']) {
+            $this->jiraService = new Services\JiraDocumentationService($jiraConfig);
+        }
+
+        // Initialize Confluence service if enabled
+        if (!empty($confluenceConfig) && $confluenceConfig['enabled']) {
+            $this->confluenceService = new Services\ConfluenceDocumentationService($confluenceConfig);
         }
     }
 
@@ -937,14 +954,39 @@ class Docudoodle
         // Clean the documentation response
         $docContent = $this->cleanResponse($docContent);
 
-        // Write to file
-        $fileContent = "# Documentation: " . basename($sourcePath) . "\n\n";
-        $fileContent .= "Original file: `{$fullRelPath}`\n\n"; // Use full relative path here
+        // Create the file title
+        $title = basename($sourcePath);
+        $fileContent = "# Documentation: " . $title . "\n\n";
+        $fileContent .= "Original file: `{$fullRelPath}`\n\n";
         $fileContent .= $docContent;
 
-        file_put_contents($outputPath, $fileContent);
+        // Create documentation in file system
+        if ($this->outputDir !== 'none') {
+            $outputPath = $outputDir . $relDir . "/" . $fileName . ".md";
+            $this->ensureDirectoryExists(dirname($outputPath));
+            file_put_contents($outputPath, $fileContent);
+            echo "Documentation created: {$outputPath}\n";
+        }
 
-        echo "Documentation created: {$outputPath}\n";
+        // Create Jira documentation if enabled
+        if ($this->jiraService) {
+            $success = $this->jiraService->createOrUpdateDocumentation($title, $fileContent);
+            if ($success) {
+                echo "Documentation created in Jira: {$title}\n";
+            } else {
+                echo "Failed to create documentation in Jira: {$title}\n";
+            }
+        }
+
+        // Create Confluence documentation if enabled
+        if ($this->confluenceService) {
+            $success = $this->confluenceService->createOrUpdatePage($title, $fileContent);
+            if ($success) {
+                echo "Documentation created in Confluence: {$title}\n";
+            } else {
+                echo "Failed to create documentation in Confluence: {$title}\n";
+            }
+        }
 
         // Update the hash map if caching is enabled
         if ($this->useCache) {
@@ -955,7 +997,9 @@ class Docudoodle
         }
 
         // Update the index after creating each documentation file
-        $this->updateDocumentationIndex($outputPath, $outputDir);
+        if ($this->outputDir !== 'none') {
+            $this->updateDocumentationIndex($outputPath, $outputDir);
+        }
 
         // Rate limiting to avoid hitting API limits
         usleep(500000); // 0.5 seconds

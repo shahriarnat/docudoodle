@@ -77,12 +77,14 @@ Set your Claude API key here or in your `.env` file as `CLAUDE_API_KEY`.
 Set your Gemini API key here or in your `.env` file as `GEMINI_API_KEY`.
 
 ### Azure OpenAI Settings
+
 ```php
 'azure_endpoint' => env('AZURE_OPENAI_ENDPOINT', ''),
 'azure_api_key' => env('AZURE_OPENAI_API_KEY', ''),
 'azure_deployment' => env('AZURE_OPENAI_DEPLOYMENT', ''),
 'azure_api_version' => env('AZURE_OPENAI_API_VERSION', '2023-05-15'),
 ```
+
 Configure Azure OpenAI integration. You need to provide the endpoint URL, API key, deployment ID, and optionally the API version if using Azure as your API provider.
 
 ### Model Selection
@@ -175,9 +177,9 @@ The cache file is a JSON document with the following structure:
 
 ```json
 {
-  "_config_hash": "abc123...", // Hash of current configuration settings
-  "/path/to/file1.php": "def456...", // File path and content hash pairs
-  "/path/to/file2.php": "789ghi..."
+	"_config_hash": "abc123...", // Hash of current configuration settings
+	"/path/to/file1.php": "def456...", // File path and content hash pairs
+	"/path/to/file2.php": "789ghi..."
 }
 ```
 
@@ -229,6 +231,7 @@ $docudoodle = new Docudoodle(
 To generate documentation using Azure OpenAI:
 
 1. Set up your Azure configuration in the `.env` file:
+
 ```
 AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com
 AZURE_OPENAI_API_KEY=your-api-key
@@ -237,13 +240,86 @@ DOCUDOODLE_API_PROVIDER=azure
 ```
 
 2. Run the command:
+
 ```
 php artisan docudoodle:generate
 ```
 
 You can also specify Azure parameters directly in the command:
+
 ```
 php artisan docudoodle:generate --api-provider=azure --azure-endpoint=https://your-resource.openai.azure.com --azure-deployment=your-deployment
+```
+
+## Documentation Output Options
+
+### File System Output
+
+By default, Docudoodle generates documentation in Markdown format in your specified output directory.
+
+### Jira Integration
+
+Docudoodle can publish documentation directly to Jira as issues. To enable this:
+
+1. Configure your Jira settings in `.env`:
+
+```
+DOCUDOODLE_JIRA_ENABLED=true
+JIRA_HOST=https://your-domain.atlassian.net
+JIRA_API_TOKEN=your-api-token
+JIRA_EMAIL=your-email@example.com
+JIRA_PROJECT_KEY=your-project-key
+JIRA_ISSUE_TYPE=Documentation
+```
+
+2. Run the command with Jira enabled:
+
+```
+php artisan docudoodle:generate --jira
+```
+
+### Confluence Integration
+
+Docudoodle can publish documentation directly to Confluence. To enable this:
+
+1. Configure your Confluence settings in `.env`:
+
+```
+DOCUDOODLE_CONFLUENCE_ENABLED=true
+CONFLUENCE_HOST=https://your-domain.atlassian.net
+CONFLUENCE_API_TOKEN=your-api-token
+CONFLUENCE_EMAIL=your-email@example.com
+CONFLUENCE_SPACE_KEY=your-space-key
+CONFLUENCE_PARENT_PAGE_ID=optional-parent-page-id
+```
+
+2. Run the command with Confluence enabled:
+
+```
+php artisan docudoodle:generate --confluence
+```
+
+### Dependencies
+
+To use Jira or Confluence integration, make sure to install the Guzzle HTTP client:
+
+```
+composer require guzzlehttp/guzzle:^7.0
+```
+
+### Command Options
+
+```bash
+php artisan docudoodle:generate
+    --jira              # Enable Jira documentation output
+    --confluence        # Enable Confluence documentation output
+    --no-files         # Disable file system documentation output
+```
+
+You can combine these options as needed. For example, to generate documentation in both Jira and Confluence but not in the file system:
+
+```bash
+php artisan docudoodle:generate --jira --confluence --no-files
 ```
 
 ## Running Tests

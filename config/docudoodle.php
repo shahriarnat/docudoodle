@@ -117,6 +117,54 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Jira Settings
+    |--------------------------------------------------------------------------
+    |
+    | Settings for Jira integration.
+    |
+    | enabled: Enable/disable Jira integration
+    | host: Your Jira instance URL (e.g., https://your-domain.atlassian.net)
+    | api_token: Your Jira API token
+    | email: Your Atlassian account email
+    | project_key: The Jira project key where documentation should be created
+    | issue_type: The type of issue to create (default: 'Documentation')
+    |
+    */
+    'jira' => [
+        'enabled' => env('DOCUDOODLE_JIRA_ENABLED', false),
+        'host' => env('JIRA_HOST', ''),
+        'api_token' => env('JIRA_API_TOKEN', ''),
+        'email' => env('JIRA_EMAIL', ''),
+        'project_key' => env('JIRA_PROJECT_KEY', ''),
+        'issue_type' => env('JIRA_ISSUE_TYPE', 'Documentation'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Confluence Settings
+    |--------------------------------------------------------------------------
+    |
+    | Settings for Confluence integration.
+    |
+    | enabled: Enable/disable Confluence integration
+    | host: Your Confluence instance URL (e.g., https://your-domain.atlassian.net)
+    | api_token: Your Confluence API token
+    | email: Your Atlassian account email
+    | space_key: The Confluence space where documentation should be created
+    | parent_page_id: Optional parent page ID under which to create documentation
+    |
+    */
+    'confluence' => [
+        'enabled' => env('DOCUDOODLE_CONFLUENCE_ENABLED', false),
+        'host' => env('CONFLUENCE_HOST', ''),
+        'api_token' => env('CONFLUENCE_API_TOKEN', ''),
+        'email' => env('CONFLUENCE_EMAIL', ''),
+        'space_key' => env('CONFLUENCE_SPACE_KEY', ''),
+        'parent_page_id' => env('CONFLUENCE_PARENT_PAGE_ID', ''),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Cache Settings
     |--------------------------------------------------------------------------
     |
