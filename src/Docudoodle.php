@@ -21,6 +21,24 @@ class Docudoodle
 
     /** @var \Docudoodle\Services\ConfluenceDocumentationService|null */
     private $confluenceService = null;
+    /**
+     * Application context data collected during processing
+     */
+    private array $appContext = [
+        'routes' => [],
+        'controllers' => [],
+        'models' => [],
+        'relationships' => [],
+        'imports' => [],
+    ];
+    /**
+     * In-memory cache of file hashes.
+     */
+    private array $hashMap = [];
+    /**
+     * List of source file paths encountered during the run.
+     */
+    private array $encounteredFiles = [];
 
     /**
      * Constructor for Docudoodle
@@ -39,38 +57,37 @@ class Docudoodle
      * @param bool $useCache Whether to use the caching mechanism
      * @param ?string $cacheFilePath Specific path to the cache file (null for default)
      * @param bool $forceRebuild Force regeneration ignoring cache
-
      * @param string $azureEndpoint Azure OpenAI endpoint URL (default: "")
      * @param string $azureDeployment Azure OpenAI deployment ID (default: "")
      * @param string $azureApiVersion Azure OpenAI API version (default: "2023-05-15")
-
      */
     public function __construct(
-        private string $openaiApiKey = "",
-        private array $sourceDirs = ["app/", "config/", "routes/", "database/"],
-        private string $outputDir = "documentation/",
-        private string $model = "gpt-4o-mini",
-        private int $maxTokens = 10000,
-        private array $allowedExtensions = ["php", "yaml", "yml"],
-        private array $skipSubdirectories = [
+        private string  $openaiApiKey = "",
+        private array   $sourceDirs = ["app/", "config/", "routes/", "database/"],
+        private string  $outputDir = "documentation/",
+        private string  $model = "gpt-4o-mini",
+        private int     $maxTokens = 10000,
+        private array   $allowedExtensions = ["php", "yaml", "yml"],
+        private array   $skipSubdirectories = [
             "vendor/",
             "node_modules/",
             "tests/",
             "cache/",
         ],
-        private string $apiProvider = "openai",
-        private string $ollamaHost = "localhost",
-        private int $ollamaPort = 5000,
-        private string $promptTemplate = __DIR__ . "/../resources/templates/default-prompt.md",
-        private bool $useCache = true,
+        private string  $apiProvider = "openai",
+        private string  $ollamaHost = "localhost",
+        private int     $ollamaPort = 5000,
+        private string  $promptTemplate = __DIR__ . "/../resources/templates/default-prompt.md",
+        private bool    $useCache = true,
         private ?string $cacheFilePath = null,
-        private bool $forceRebuild = false,
-        private string $azureEndpoint = "",
-        private string $azureDeployment = "",
-        private string $azureApiVersion = "2023-05-15",
-        private array $jiraConfig = [],
-        private array $confluenceConfig = []
-    ) {
+        private bool    $forceRebuild = false,
+        private string  $azureEndpoint = "",
+        private string  $azureDeployment = "",
+        private string  $azureApiVersion = "2023-05-15",
+        private array   $jiraConfig = [],
+        private array   $confluenceConfig = []
+    )
+    {
         // Ensure the cache file path is set if using cache and no specific path is provided
         if ($this->useCache && empty($this->cacheFilePath)) {
             $this->cacheFilePath = rtrim($this->outputDir, '/') . '/.docudoodle_cache.json';
@@ -88,25 +105,109 @@ class Docudoodle
     }
 
     /**
-     * Application context data collected during processing
+     * Main method to execute the documentation generation
      */
-    private array $appContext = [
-        'routes' => [],
-        'controllers' => [],
-        'models' => [],
-        'relationships' => [],
-        'imports' => [],
-    ];
+    public function generate(): void
+    {
+        // Ensure output directory exists
+        $this->ensureDirectoryExists($this->outputDir);
 
-    /**
-     * In-memory cache of file hashes.
-     */
-    private array $hashMap = [];
+        // Initialize cache and encountered files list
+        $this->hashMap = [];
+        $this->encounteredFiles = [];
 
-    /**
-     * List of source file paths encountered during the run.
-     */
-    private array $encounteredFiles = [];
+        // Load existing hash map and check config hash if caching is enabled
+        if ($this->useCache && !$this->forceRebuild) {
+            $this->hashMap = $this->loadHashMap();
+            $currentConfigHash = $this->calculateConfigHash();
+            $storedConfigHash = $this->hashMap['_config_hash'] ?? null;
+
+            if ($currentConfigHash !== $storedConfigHash) {
+                echo "Configuration changed or cache invalidated. Forcing full documentation rebuild.\n";
+                // Clear file hashes but keep the config hash key for updating later
+                $fileHashes = $this->hashMap;
+                unset($fileHashes['_config_hash']);
+                $this->hashMap = ['_config_hash' => $currentConfigHash];
+                // Mark for rebuild internally by setting forceRebuild temporarily
+                // This ensures config hash is updated even if generate() is interrupted
+                $this->forceRebuild = true; // Temporarily force rebuild for this run
+            } else {
+                echo "Using existing cache file: {$this->cacheFilePath}\n";
+            }
+        }
+
+        // If forcing rebuild (either via option or config change), ensure config hash is set
+        if ($this->useCache && $this->forceRebuild) {
+            $this->hashMap['_config_hash'] = $this->calculateConfigHash();
+            echo "Cache will be rebuilt.\n";
+        }
+
+        // Process each source directory
+        foreach ($this->sourceDirs as $sourceDir) {
+            if (file_exists($sourceDir)) {
+                echo "Processing directory: {$sourceDir}\n";
+                $this->processDirectory($sourceDir);
+            } else {
+                echo "Directory not found: {$sourceDir}\n";
+            }
+        }
+
+        // --- Start Orphan Cleanup ---
+        if ($this->useCache) {
+            $cachedFiles = array_keys(array_filter($this->hashMap, fn($key) => $key !== '_config_hash', ARRAY_FILTER_USE_KEY));
+            $orphans = array_diff($cachedFiles, $this->encounteredFiles);
+
+            if (!empty($orphans)) {
+                echo "Cleaning up documentation for deleted source files...\n";
+                $outputDirPrefixed = rtrim($this->outputDir, "/") . "/";
+
+                foreach ($orphans as $orphanSourcePath) {
+                    // Find the original base source directory for the orphan
+                    $baseSourceDir = null;
+                    foreach ($this->sourceDirs as $dir) {
+                        // Ensure consistent directory separators and trailing slash for comparison
+                        $normalizedDir = rtrim(str_replace('\\', '/', $dir), '/') . '/';
+                        $normalizedOrphanPath = str_replace('\\', '/', $orphanSourcePath);
+
+                        if (strpos($normalizedOrphanPath, $normalizedDir) === 0) {
+                            $baseSourceDir = $dir;
+                            break;
+                        }
+                    }
+
+                    if ($baseSourceDir) {
+                        $relPath = substr($orphanSourcePath, strlen(rtrim($baseSourceDir, '/')) + 1);
+                        $sourceDirName = basename(rtrim($baseSourceDir, "/"));
+                        $fullRelPath = $sourceDirName . "/" . $relPath;
+                        $relDir = dirname($fullRelPath);
+                        $fileName = pathinfo($relPath, PATHINFO_FILENAME);
+                        $docPath = $outputDirPrefixed . $relDir . "/" . $fileName . ".md";
+
+                        if (file_exists($docPath)) {
+                            echo "Deleting orphan documentation: {$docPath}\n";
+                            @unlink($docPath); // Use @ to suppress errors if deletion fails
+                        }
+                    } else {
+                        echo "Warning: Could not determine source directory for orphan path: {$orphanSourcePath}\n";
+                    }
+
+                    // Remove orphan from the hash map regardless
+                    unset($this->hashMap[$orphanSourcePath]);
+                }
+            }
+        }
+        // --- End Orphan Cleanup ---
+
+        // Make sure the index is fully up to date
+        $this->finalizeDocumentationIndex();
+
+        // Save the updated hash map if caching is enabled
+        if ($this->useCache) {
+            $this->saveHashMap($this->hashMap);
+        }
+
+        echo "\nDocumentation generation complete! Files are available in the '{$this->outputDir}' directory.\n";
+    }
 
     /**
      * Ensure the output directory exists
@@ -119,28 +220,86 @@ class Docudoodle
     }
 
     /**
-     * Get the file extension
+     * Load the hash map from the cache file.
+     *
+     * @return array The loaded hash map or empty array on failure/not found.
      */
-    private function getFileExtension($filePath): string
+    private function loadHashMap(): array
     {
-        return pathinfo($filePath, PATHINFO_EXTENSION);
+        if (!$this->useCache || !$this->cacheFilePath || !file_exists($this->cacheFilePath)) {
+            return [];
+        }
+
+        try {
+            $content = file_get_contents($this->cacheFilePath);
+            $map = json_decode($content, true);
+            return is_array($map) ? $map : [];
+        } catch (Exception $e) {
+            echo "Warning: Could not read or decode cache file: {$this->cacheFilePath} - {$e->getMessage()}\n";
+            return [];
+        }
     }
 
     /**
-     * Determine if file should be processed based on extension
+     * Calculate a hash representing the current configuration relevant to caching.
+     *
+     * @return string The configuration hash.
      */
-    private function shouldProcessFile($filePath): bool
+    private function calculateConfigHash(): string
     {
-        $ext = strtolower($this->getFileExtension($filePath));
-        $baseName = basename($filePath);
+        $realTemplatePath = realpath($this->promptTemplate) ?: $this->promptTemplate; // Use realpath or fallback
+        $configData = [
+            'model' => $this->model,
+            'apiProvider' => $this->apiProvider,
+            'promptTemplatePath' => $realTemplatePath, // Use normalized path
+            'promptTemplateContent' => file_exists($this->promptTemplate) ? sha1_file($this->promptTemplate) : 'template_not_found'
+        ];
+        return sha1(json_encode($configData));
+    }
 
-        // Skip hidden files
-        if (strpos($baseName, ".") === 0) {
-            return false;
+    /**
+     * Process all files in directory recursively
+     */
+    private function processDirectory($baseDir): void
+    {
+        $baseDir = rtrim($baseDir, "/");
+
+        $iterator = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator(
+                $baseDir,
+                RecursiveDirectoryIterator::SKIP_DOTS
+            )
+        );
+
+        foreach ($iterator as $file) {
+            // Skip directories
+            if ($file->isDir()) {
+                continue;
+            }
+
+            $sourcePath = $file->getPathname();
+            $dirName = basename(dirname($sourcePath));
+            $fileName = $file->getBasename();
+
+            // Skip hidden files and directories
+            if (strpos($fileName, ".") === 0 || strpos($dirName, ".") === 0) {
+                continue;
+            }
+
+            // Calculate relative path from the source directory
+            $relFilePath = substr($sourcePath, strlen($baseDir) + 1);
+
+            // Check if parent directory should be processed
+            $relDirPath = dirname($relFilePath);
+            if (!$this->shouldProcessDirectory($relDirPath)) {
+                continue;
+            }
+
+            // Record encountered file
+            $this->encounteredFiles[] = $sourcePath;
+
+            $this->createDocumentationFile($sourcePath, $relFilePath, $baseDir);
         }
-
-        // Only process files with allowed extensions
-        return in_array($ext, $this->allowedExtensions);
     }
 
     /**
@@ -174,6 +333,147 @@ class Docudoodle
     }
 
     /**
+     * Create documentation file for a given source file
+     */
+    private function createDocumentationFile($sourcePath, $relPath, $sourceDir): bool
+    {
+        // Check cache first if enabled
+        if ($this->useCache && !$this->forceRebuild) {
+            $currentHash = $this->calculateFileHash($sourcePath);
+            if ($currentHash !== false && isset($this->hashMap[$sourcePath]) && $this->hashMap[$sourcePath] === $currentHash) {
+                echo "Skipping unchanged file: {$sourcePath}\n";
+                return false; // File was unchanged and skipped
+            }
+        }
+
+        // Define output path - preserve complete directory structure including source directory name
+        $outputDir = rtrim($this->outputDir, "/") . "/";
+
+        // Get just the source directory basename (without full path)
+        $sourceDirName = basename(rtrim($sourceDir, "/"));
+
+        // Prepend the source directory name to the relative path to maintain the full structure
+        $fullRelPath = $sourceDirName . "/" . $relPath;
+        $relDir = dirname($fullRelPath);
+        $fileName = pathinfo($relPath, PATHINFO_FILENAME);
+
+        // Create proper output path
+        $outputPath = $outputDir . $relDir . "/" . $fileName . ".md";
+
+        // Ensure the directory exists
+        $this->ensureDirectoryExists(dirname($outputPath));
+
+        // Check if file is valid for processing
+        if (!$this->shouldProcessFile($sourcePath)) {
+            return false;
+        }
+
+        // Read content
+        $content = $this->readFileContent($sourcePath);
+
+        // Generate documentation
+        echo "Generating documentation for {$sourcePath}...\n";
+        $docContent = $this->generateDocumentation($sourcePath, $content);
+
+        // Clean the documentation response
+        $docContent = $this->cleanResponse($docContent);
+
+        // Create the file title
+        $title = basename($sourcePath);
+        $fileContent = "# Documentation: " . $title . "\n\n";
+        $fileContent .= "Original file: `{$fullRelPath}`\n\n";
+        $fileContent .= $docContent;
+
+        // Create documentation in file system
+        if ($this->outputDir !== 'none') {
+            $outputPath = $outputDir . $relDir . "/" . $fileName . ".md";
+            $this->ensureDirectoryExists(dirname($outputPath));
+            file_put_contents($outputPath, $fileContent);
+            echo "Documentation created: {$outputPath}\n";
+        }
+
+        // Create Jira documentation if enabled
+        if ($this->jiraService) {
+            $success = $this->jiraService->createOrUpdateDocumentation($title, $fileContent);
+            if ($success) {
+                echo "Documentation created in Jira: {$title}\n";
+            } else {
+                echo "Failed to create documentation in Jira: {$title}\n";
+            }
+        }
+
+        // Create Confluence documentation if enabled
+        if ($this->confluenceService) {
+            $success = $this->confluenceService->createOrUpdatePage($title, $fileContent);
+            if ($success) {
+                echo "Documentation created in Confluence: {$title}\n";
+            } else {
+                echo "Failed to create documentation in Confluence: {$title}\n";
+            }
+        }
+
+        // Update the hash map if caching is enabled
+        if ($this->useCache) {
+            $currentHash = $this->calculateFileHash($sourcePath);
+            if ($currentHash !== false) {
+                $this->hashMap[$sourcePath] = $currentHash;
+            }
+        }
+
+        // Update the index after creating each documentation file
+        if ($this->outputDir !== 'none') {
+            $this->updateDocumentationIndex($outputPath, $outputDir);
+        }
+
+        // Rate limiting to avoid hitting API limits
+        usleep(500000); // 0.5 seconds
+
+        // Add the encountered file path to the encounteredFiles array
+        $this->encounteredFiles[] = $sourcePath;
+
+        return true; // File was processed
+    }
+
+    /**
+     * Calculate the SHA1 hash of a file's content.
+     *
+     * @param string $filePath Path to the file.
+     * @return string|false The SHA1 hash or false on failure.
+     */
+    private function calculateFileHash(string $filePath): string|false
+    {
+        if (!file_exists($filePath)) {
+            return false;
+        }
+        return sha1_file($filePath);
+    }
+
+    /**
+     * Determine if file should be processed based on extension
+     */
+    private function shouldProcessFile($filePath): bool
+    {
+        $ext = strtolower($this->getFileExtension($filePath));
+        $baseName = basename($filePath);
+
+        // Skip hidden files
+        if (strpos($baseName, ".") === 0) {
+            return false;
+        }
+
+        // Only process files with allowed extensions
+        return in_array($ext, $this->allowedExtensions);
+    }
+
+    /**
+     * Get the file extension
+     */
+    private function getFileExtension($filePath): string
+    {
+        return pathinfo($filePath, PATHINFO_EXTENSION);
+    }
+
+    /**
      * Read the content of a file safely
      */
     private function readFileContent($filePath): string
@@ -183,14 +483,6 @@ class Docudoodle
         } catch (Exception $e) {
             return "Error reading file: " . $e->getMessage();
         }
-    }
-
-    /**
-     * Remove <think></think> tags from the response
-     */
-    private function cleanResponse(string $response): string
-    {
-        return preg_replace('/<think>.*?<\/think>/', '', $response);
     }
 
     /**
@@ -267,12 +559,10 @@ class Docudoodle
 
             // Find related route definitions
             $context['routes'] = $this->findRelatedRoutes($className, $fullClassName);
-        }
-
-        // Check if it's a route file
+        } // Check if it's a route file
         else if ($fileExt === 'php' && (strpos($filePath, 'routes') !== false ||
-                 strpos($filePath, 'web.php') !== false ||
-                 strpos($filePath, 'api.php') !== false)) {
+                strpos($filePath, 'web.php') !== false ||
+                strpos($filePath, 'api.php') !== false)) {
             $context['isRouteFile'] = true;
             $routeData = $this->extractRoutes($content);
             $context['definedRoutes'] = $routeData;
@@ -381,8 +671,8 @@ class Docudoodle
         $relationships = [];
 
         $relationshipTypes = ['hasMany', 'hasOne', 'belongsTo', 'belongsToMany',
-                             'hasOneThrough', 'hasManyThrough', 'morphTo',
-                             'morphOne', 'morphMany', 'morphToMany'];
+            'hasOneThrough', 'hasManyThrough', 'morphTo',
+            'morphOne', 'morphMany', 'morphToMany'];
 
         foreach ($relationshipTypes as $type) {
             if (preg_match_all('/function\s+(\w+)\s*\([^)]*\)[^{]*{[^}]*\$this->' . $type . '\s*\(\s*([^,\)]+)/i',
@@ -402,6 +692,26 @@ class Docudoodle
         }
 
         return $relationships;
+    }
+
+    /**
+     * Find routes related to a controller
+     */
+    private function findRelatedRoutes(string $className, string $fullClassName): array
+    {
+        $relatedRoutes = [];
+
+        foreach ($this->appContext['routes'] as $route) {
+            if (isset($route['controller'])) {
+                // Check against both short and full class names
+                if ($route['controller'] === $className ||
+                    $route['controller'] === $fullClassName) {
+                    $relatedRoutes[] = $route;
+                }
+            }
+        }
+
+        return $relatedRoutes;
     }
 
     /**
@@ -437,8 +747,7 @@ class Docudoodle
                     'action' => $matches[4],
                 ];
                 $routes[] = $currentRoute;
-            }
-            // Check for array style controller
+            } // Check for array style controller
             else if (preg_match($routePatterns[1], $line, $matches)) {
                 $currentRoute = [
                     'method' => strtoupper($matches[1]),
@@ -447,8 +756,7 @@ class Docudoodle
                     'action' => $matches[4],
                 ];
                 $routes[] = $currentRoute;
-            }
-            // Check for route name
+            } // Check for route name
             else if (preg_match($routePatterns[2], $line, $matches) && $currentRoute) {
                 $lastIndex = count($routes) - 1;
                 if ($lastIndex >= 0) {
@@ -458,26 +766,6 @@ class Docudoodle
         }
 
         return $routes;
-    }
-
-    /**
-     * Find routes related to a controller
-     */
-    private function findRelatedRoutes(string $className, string $fullClassName): array
-    {
-        $relatedRoutes = [];
-
-        foreach ($this->appContext['routes'] as $route) {
-            if (isset($route['controller'])) {
-                // Check against both short and full class names
-                if ($route['controller'] === $className ||
-                    $route['controller'] === $fullClassName) {
-                    $relatedRoutes[] = $route;
-                }
-            }
-        }
-
-        return $relatedRoutes;
     }
 
     /**
@@ -510,6 +798,66 @@ class Docudoodle
         }
 
         return '';
+    }
+
+    /**
+     * Generate documentation using Ollama API
+     */
+    private function generateDocumentationWithOllama($filePath, $content, $context = []): string
+    {
+        try {
+            // Check content length and truncate if necessary
+            if (strlen($content) > $this->maxTokens * 4) {
+                // Rough estimate of token count
+                $content =
+                    substr($content, 0, $this->maxTokens * 4) .
+                    "\n...(truncated for length)...";
+            }
+
+            $prompt = $this->loadPromptTemplate($filePath, $content, $context);
+
+            $postData = [
+                "model" => $this->model,
+                "messages" => [
+                    [
+                        "role" => "system",
+                        "content" =>
+                            "You are a technical documentation specialist with expertise in PHP applications.",
+                    ],
+                    ["role" => "user", "content" => $prompt],
+                ],
+                "max_tokens" => $this->maxTokens,
+                "stream" => false,
+            ];
+
+            // Ollama runs locally on the configured host and port
+            $ch = curl_init(
+                "http://{$this->ollamaHost}:{$this->ollamaPort}/api/chat"
+            );
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($postData));
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                "Content-Type: application/json",
+            ]);
+
+            $response = curl_exec($ch);
+            if (curl_errno($ch)) {
+                throw new Exception(curl_error($ch));
+            }
+            curl_close($ch);
+
+            $responseData = json_decode($response, true);
+
+            if (isset($responseData["message"]["content"])) {
+                return $responseData["message"]["content"];
+            } else {
+                throw new Exception("Unexpected API response format");
+            }
+        } catch (Exception $e) {
+            return "# Documentation Generation Error\n\nThere was an error generating documentation for this file: " .
+                $e->getMessage();
+        }
     }
 
     /**
@@ -612,179 +960,11 @@ class Docudoodle
     }
 
     /**
-     * Generate documentation using OpenAI API
+     * Normalize a string for Table of Contents links
      */
-    private function generateDocumentationWithOpenAI($filePath, $content, $context = []): string
+    private function normalizeForToc(string $text): string
     {
-        try {
-            // Check content length and truncate if necessary
-            if (strlen($content) > $this->maxTokens * 4) {
-                // Rough estimate of token count
-                $content =
-                    substr($content, 0, $this->maxTokens * 4) .
-                    "\n...(truncated for length)...";
-            }
-
-            $prompt = $this->loadPromptTemplate($filePath, $content, $context);
-
-            $postData = [
-                "model" => $this->model,
-                "messages" => [
-                    [
-                        "role" => "system",
-                        "content" =>
-                            "You are a technical documentation specialist with expertise in PHP applications.",
-                    ],
-                    ["role" => "user", "content" => $prompt],
-                ],
-                "max_tokens" => 1500,
-            ];
-
-            $ch = curl_init("https://api.openai.com/v1/chat/completions");
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_POST, true);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($postData));
-            curl_setopt($ch, CURLOPT_HTTPHEADER, [
-                "Content-Type: application/json",
-                "Authorization: Bearer " . $this->openaiApiKey,
-            ]);
-
-            $response = curl_exec($ch);
-            if (curl_errno($ch)) {
-                throw new Exception(curl_error($ch));
-            }
-            curl_close($ch);
-
-            $responseData = json_decode($response, true);
-
-            if (isset($responseData["choices"][0]["message"]["content"])) {
-                return $responseData["choices"][0]["message"]["content"];
-            } else {
-                throw new Exception("Unexpected API response format");
-            }
-        } catch (Exception $e) {
-            return "# Documentation Generation Error\n\nThere was an error generating documentation for this file: " .
-                $e->getMessage();
-        }
-    }
-
-    /**
-     * Generate documentation using Azure OpenAI API
-     */
-    private function generateDocumentationWithAzureOpenAI($filePath, $content, $context = []): string
-    {
-        try {
-            // Check content length and truncate if necessary
-            if (strlen($content) > $this->maxTokens * 4) {
-                // Rough estimate of token count
-                $content =
-                    substr($content, 0, $this->maxTokens * 4) .
-                    "\n...(truncated for length)...";
-            }
-
-            $prompt = $this->loadPromptTemplate($filePath, $content, $context);
-
-            $postData = [
-                "messages" => [
-                    [
-                        "role" => "system",
-                        "content" => "You are a technical documentation specialist with expertise in PHP applications.",
-                    ],
-                    ["role" => "user", "content" => $prompt],
-                ],
-                "max_tokens" => 1500,
-            ];
-
-            // Azure OpenAI API requires a different endpoint format and authentication method
-            $endpoint = rtrim($this->azureEndpoint, '/');
-            $url = "{$endpoint}/openai/deployments/{$this->azureDeployment}/chat/completions?api-version={$this->azureApiVersion}";
-            
-            $ch = curl_init($url);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_POST, true);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($postData));
-            curl_setopt($ch, CURLOPT_HTTPHEADER, [
-                "Content-Type: application/json",
-                "api-key: " . $this->openaiApiKey,
-            ]);
-
-            $response = curl_exec($ch);
-            if (curl_errno($ch)) {
-                throw new Exception(curl_error($ch));
-            }
-            curl_close($ch);
-
-            $responseData = json_decode($response, true);
-
-            if (isset($responseData["choices"][0]["message"]["content"])) {
-                return $responseData["choices"][0]["message"]["content"];
-            } else {
-                throw new Exception("Unexpected Azure OpenAI API response format: " . json_encode($responseData));
-            }
-        } catch (Exception $e) {
-            return "# Documentation Generation Error\n\nThere was an error generating documentation for this file: " .
-                $e->getMessage();
-        }
-    }
-
-    /**
-     * Generate documentation using Ollama API
-     */
-    private function generateDocumentationWithOllama($filePath, $content, $context = []): string
-    {
-        try {
-            // Check content length and truncate if necessary
-            if (strlen($content) > $this->maxTokens * 4) {
-                // Rough estimate of token count
-                $content =
-                    substr($content, 0, $this->maxTokens * 4) .
-                    "\n...(truncated for length)...";
-            }
-
-            $prompt = $this->loadPromptTemplate($filePath, $content, $context);
-
-            $postData = [
-                "model" => $this->model,
-                "messages" => [
-                    [
-                        "role" => "system",
-                        "content" =>
-                            "You are a technical documentation specialist with expertise in PHP applications.",
-                    ],
-                    ["role" => "user", "content" => $prompt],
-                ],
-                "max_tokens" => $this->maxTokens,
-                "stream" => false,
-            ];
-
-            // Ollama runs locally on the configured host and port
-            $ch = curl_init(
-                "http://{$this->ollamaHost}:{$this->ollamaPort}/api/chat"
-            );
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_POST, true);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($postData));
-            curl_setopt($ch, CURLOPT_HTTPHEADER, [
-                "Content-Type: application/json",
-            ]);
-
-            $response = curl_exec($ch);
-            if (curl_errno($ch)) {
-                throw new Exception(curl_error($ch));
-            }
-            curl_close($ch);
-
-            $responseData = json_decode($response, true);
-
-            if (isset($responseData["message"]["content"])) {
-                return $responseData["message"]["content"];
-            } else {
-                throw new Exception("Unexpected API response format");
-            }
-        } catch (Exception $e) {
-            return "# Documentation Generation Error\n\nThere was an error generating documentation for this file: " .
-                $e->getMessage();
-        }
+        return strtolower(preg_replace('/[^a-z0-9]+/', '-', trim($text)));
     }
 
     /**
@@ -805,12 +985,8 @@ class Docudoodle
 
             $postData = [
                 "model" => $this->model,
+                "system" => "You are an experienced technical documentation specialist with deep expertise in PHP applications, frameworks, and related technologies. Your task is to write clear, structured, and professional documentation that follows industry best practices. The document should be technically accurate, easy to understand for developers, and formatted with proper headings, examples, and explanations. Use a concise, authoritative, and professional tone throughout.",
                 "messages" => [
-                    [
-                        "role" => "system",
-                        "content" =>
-                            "You are a technical documentation specialist with expertise in PHP applications.",
-                    ],
                     ["role" => "user", "content" => $prompt],
                 ],
                 "max_tokens" => $this->maxTokens,
@@ -818,13 +994,14 @@ class Docudoodle
             ];
 
             // Claude API endpoint
-            $ch = curl_init("https://api.claude.ai/v1/chat/completions");
+            $ch = curl_init("https://api.anthropic.com/v1/messages");
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_POST, true);
             curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($postData));
             curl_setopt($ch, CURLOPT_HTTPHEADER, [
                 "Content-Type: application/json",
-                "Authorization: Bearer " . $this->openaiApiKey,
+                "anthropic-version: 2023-06-01",
+                "x-api-key: " . $this->openaiApiKey,
             ]);
 
             $response = curl_exec($ch);
@@ -835,14 +1012,13 @@ class Docudoodle
 
             $responseData = json_decode($response, true);
 
-            if (isset($responseData["choices"][0]["message"]["content"])) {
-                return $responseData["choices"][0]["message"]["content"];
+            if (isset($responseData["content"][0]["text"])) {
+                return $responseData["content"][0]["text"];
             } else {
                 throw new Exception("Unexpected API response format");
             }
         } catch (Exception $e) {
-            return "# Documentation Generation Error\n\nThere was an error generating documentation for this file: " .
-                $e->getMessage();
+            die ("# Documentation Generation Error\n\nThere was an error generating documentation for this file: " . $e->getMessage());
         }
     }
 
@@ -909,105 +1085,127 @@ class Docudoodle
     }
 
     /**
-     * Create documentation file for a given source file
+     * Generate documentation using Azure OpenAI API
      */
-    private function createDocumentationFile($sourcePath, $relPath, $sourceDir): bool
+    private function generateDocumentationWithAzureOpenAI($filePath, $content, $context = []): string
     {
-        // Check cache first if enabled
-        if ($this->useCache && !$this->forceRebuild) {
-            $currentHash = $this->calculateFileHash($sourcePath);
-            if ($currentHash !== false && isset($this->hashMap[$sourcePath]) && $this->hashMap[$sourcePath] === $currentHash) {
-                echo "Skipping unchanged file: {$sourcePath}\n";
-                return false; // File was unchanged and skipped
+        try {
+            // Check content length and truncate if necessary
+            if (strlen($content) > $this->maxTokens * 4) {
+                // Rough estimate of token count
+                $content =
+                    substr($content, 0, $this->maxTokens * 4) .
+                    "\n...(truncated for length)...";
             }
-        }
 
-        // Define output path - preserve complete directory structure including source directory name
-        $outputDir = rtrim($this->outputDir, "/") . "/";
+            $prompt = $this->loadPromptTemplate($filePath, $content, $context);
 
-        // Get just the source directory basename (without full path)
-        $sourceDirName = basename(rtrim($sourceDir, "/"));
+            $postData = [
+                "messages" => [
+                    [
+                        "role" => "system",
+                        "content" => "You are a technical documentation specialist with expertise in PHP applications.",
+                    ],
+                    ["role" => "user", "content" => $prompt],
+                ],
+                "max_tokens" => 1500,
+            ];
 
-        // Prepend the source directory name to the relative path to maintain the full structure
-        $fullRelPath = $sourceDirName . "/" . $relPath;
-        $relDir = dirname($fullRelPath);
-        $fileName = pathinfo($relPath, PATHINFO_FILENAME);
+            // Azure OpenAI API requires a different endpoint format and authentication method
+            $endpoint = rtrim($this->azureEndpoint, '/');
+            $url = "{$endpoint}/openai/deployments/{$this->azureDeployment}/chat/completions?api-version={$this->azureApiVersion}";
 
-        // Create proper output path
-        $outputPath = $outputDir . $relDir . "/" . $fileName . ".md";
+            $ch = curl_init($url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($postData));
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                "Content-Type: application/json",
+                "api-key: " . $this->openaiApiKey,
+            ]);
 
-        // Ensure the directory exists
-        $this->ensureDirectoryExists(dirname($outputPath));
+            $response = curl_exec($ch);
+            if (curl_errno($ch)) {
+                throw new Exception(curl_error($ch));
+            }
+            curl_close($ch);
 
-        // Check if file is valid for processing
-        if (!$this->shouldProcessFile($sourcePath)) {
-            return false;
-        }
+            $responseData = json_decode($response, true);
 
-        // Read content
-        $content = $this->readFileContent($sourcePath);
-
-        // Generate documentation
-        echo "Generating documentation for {$sourcePath}...\n";
-        $docContent = $this->generateDocumentation($sourcePath, $content);
-
-        // Clean the documentation response
-        $docContent = $this->cleanResponse($docContent);
-
-        // Create the file title
-        $title = basename($sourcePath);
-        $fileContent = "# Documentation: " . $title . "\n\n";
-        $fileContent .= "Original file: `{$fullRelPath}`\n\n";
-        $fileContent .= $docContent;
-
-        // Create documentation in file system
-        if ($this->outputDir !== 'none') {
-            $outputPath = $outputDir . $relDir . "/" . $fileName . ".md";
-            $this->ensureDirectoryExists(dirname($outputPath));
-            file_put_contents($outputPath, $fileContent);
-            echo "Documentation created: {$outputPath}\n";
-        }
-
-        // Create Jira documentation if enabled
-        if ($this->jiraService) {
-            $success = $this->jiraService->createOrUpdateDocumentation($title, $fileContent);
-            if ($success) {
-                echo "Documentation created in Jira: {$title}\n";
+            if (isset($responseData["choices"][0]["message"]["content"])) {
+                return $responseData["choices"][0]["message"]["content"];
             } else {
-                echo "Failed to create documentation in Jira: {$title}\n";
+                throw new Exception("Unexpected Azure OpenAI API response format: " . json_encode($responseData));
             }
+        } catch (Exception $e) {
+            return "# Documentation Generation Error\n\nThere was an error generating documentation for this file: " .
+                $e->getMessage();
         }
+    }
 
-        // Create Confluence documentation if enabled
-        if ($this->confluenceService) {
-            $success = $this->confluenceService->createOrUpdatePage($title, $fileContent);
-            if ($success) {
-                echo "Documentation created in Confluence: {$title}\n";
+    /**
+     * Generate documentation using OpenAI API
+     */
+    private function generateDocumentationWithOpenAI($filePath, $content, $context = []): string
+    {
+        try {
+            // Check content length and truncate if necessary
+            if (strlen($content) > $this->maxTokens * 4) {
+                // Rough estimate of token count
+                $content =
+                    substr($content, 0, $this->maxTokens * 4) .
+                    "\n...(truncated for length)...";
+            }
+
+            $prompt = $this->loadPromptTemplate($filePath, $content, $context);
+
+            $postData = [
+                "model" => $this->model,
+                "messages" => [
+                    [
+                        "role" => "system",
+                        "content" =>
+                            "You are a technical documentation specialist with expertise in PHP applications.",
+                    ],
+                    ["role" => "user", "content" => $prompt],
+                ],
+                "max_tokens" => 1500,
+            ];
+
+            $ch = curl_init("https://api.openai.com/v1/chat/completions");
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($postData));
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                "Content-Type: application/json",
+                "Authorization: Bearer " . $this->openaiApiKey,
+            ]);
+
+            $response = curl_exec($ch);
+            if (curl_errno($ch)) {
+                throw new Exception(curl_error($ch));
+            }
+            curl_close($ch);
+
+            $responseData = json_decode($response, true);
+
+            if (isset($responseData["choices"][0]["message"]["content"])) {
+                return $responseData["choices"][0]["message"]["content"];
             } else {
-                echo "Failed to create documentation in Confluence: {$title}\n";
+                throw new Exception("Unexpected API response format");
             }
+        } catch (Exception $e) {
+            return "# Documentation Generation Error\n\nThere was an error generating documentation for this file: " .
+                $e->getMessage();
         }
+    }
 
-        // Update the hash map if caching is enabled
-        if ($this->useCache) {
-            $currentHash = $this->calculateFileHash($sourcePath); 
-            if ($currentHash !== false) {
-                $this->hashMap[$sourcePath] = $currentHash;
-            }
-        }
-
-        // Update the index after creating each documentation file
-        if ($this->outputDir !== 'none') {
-            $this->updateDocumentationIndex($outputPath, $outputDir);
-        }
-
-        // Rate limiting to avoid hitting API limits
-        usleep(500000); // 0.5 seconds
-
-        // Add the encountered file path to the encounteredFiles array
-        $this->encounteredFiles[] = $sourcePath;
-        
-        return true; // File was processed
+    /**
+     * Remove <think></think> tags from the response
+     */
+    private function cleanResponse(string $response): string
+    {
+        return preg_replace('/<think>.*?<\/think>/', '', $response);
     }
 
     /**
@@ -1059,11 +1257,33 @@ class Docudoodle
     }
 
     /**
-     * Normalize a string for Table of Contents links
+     * Get all documentation files in the output directory
+     *
+     * @param string $outputDir The documentation output directory
+     * @return array List of markdown files
      */
-    private function normalizeForToc(string $text): string
+    private function getAllDocumentationFiles(string $outputDir): array
     {
-        return strtolower(preg_replace('/[^a-z0-9]+/', '-', trim($text)));
+        $files = [];
+
+        if (!is_dir($outputDir)) {
+            return $files;
+        }
+
+        $iterator = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator(
+                $outputDir,
+                RecursiveDirectoryIterator::SKIP_DOTS
+            )
+        );
+
+        foreach ($iterator as $file) {
+            if ($file->isFile() && $file->getExtension() === 'md') {
+                $files[] = $file->getPathname();
+            }
+        }
+
+        return $files;
     }
 
     /**
@@ -1099,6 +1319,27 @@ class Docudoodle
     }
 
     /**
+     * Get the title of a markdown document
+     *
+     * @param string $filePath Path to the markdown file
+     * @return string The title or fallback to filename
+     */
+    private function getDocumentTitle(string $filePath): string
+    {
+        if (!file_exists($filePath)) {
+            return basename($filePath);
+        }
+
+        $content = file_get_contents($filePath);
+        // Try to find the first heading
+        if (preg_match('/^#\s+(.+)$/m', $content, $matches)) {
+            return trim($matches[1]);
+        }
+
+        return pathinfo($filePath, PATHINFO_FILENAME);
+    }
+
+    /**
      * Generate nested markdown from the tree structure
      *
      * @param array $tree The tree structure
@@ -1125,7 +1366,7 @@ class Docudoodle
         // Then output files in the current directory level
         if (isset($tree['_files'])) {
             // Sort files by name
-            usort($tree['_files'], function($a, $b) {
+            usort($tree['_files'], function ($a, $b) {
                 return $a['name'] <=> $b['name'];
             });
 
@@ -1140,207 +1381,6 @@ class Docudoodle
     }
 
     /**
-     * Get the title of a markdown document
-     *
-     * @param string $filePath Path to the markdown file
-     * @return string The title or fallback to filename
-     */
-    private function getDocumentTitle(string $filePath): string
-    {
-        if (!file_exists($filePath)) {
-            return basename($filePath);
-        }
-
-        $content = file_get_contents($filePath);
-        // Try to find the first heading
-        if (preg_match('/^#\s+(.+)$/m', $content, $matches)) {
-            return trim($matches[1]);
-        }
-
-        return pathinfo($filePath, PATHINFO_FILENAME);
-    }
-
-    /**
-     * Get all documentation files in the output directory
-     *
-     * @param string $outputDir The documentation output directory
-     * @return array List of markdown files
-     */
-    private function getAllDocumentationFiles(string $outputDir): array
-    {
-        $files = [];
-
-        if (!is_dir($outputDir)) {
-            return $files;
-        }
-
-        $iterator = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator(
-                $outputDir,
-                RecursiveDirectoryIterator::SKIP_DOTS
-            )
-        );
-
-        foreach ($iterator as $file) {
-            if ($file->isFile() && $file->getExtension() === 'md') {
-                $files[] = $file->getPathname();
-            }
-        }
-
-        return $files;
-    }
-
-    /**
-     * Process all files in directory recursively
-     */
-    private function processDirectory($baseDir): void
-    {
-        $baseDir = rtrim($baseDir, "/");
-
-        $iterator = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator(
-                $baseDir,
-                RecursiveDirectoryIterator::SKIP_DOTS
-            )
-        );
-
-        foreach ($iterator as $file) {
-            // Skip directories
-            if ($file->isDir()) {
-                continue;
-            }
-
-            $sourcePath = $file->getPathname();
-            $dirName = basename(dirname($sourcePath));
-            $fileName = $file->getBasename();
-
-            // Skip hidden files and directories
-            if (strpos($fileName, ".") === 0 || strpos($dirName, ".") === 0) {
-                continue;
-            }
-
-            // Calculate relative path from the source directory
-            $relFilePath = substr($sourcePath, strlen($baseDir) + 1);
-
-            // Check if parent directory should be processed
-            $relDirPath = dirname($relFilePath);
-            if (!$this->shouldProcessDirectory($relDirPath)) {
-                continue;
-            }
-
-            // Record encountered file
-            $this->encounteredFiles[] = $sourcePath;
-
-            $this->createDocumentationFile($sourcePath, $relFilePath, $baseDir);
-        }
-    }
-
-    /**
-     * Main method to execute the documentation generation
-     */
-    public function generate(): void
-    {
-        // Ensure output directory exists
-        $this->ensureDirectoryExists($this->outputDir);
-
-        // Initialize cache and encountered files list
-        $this->hashMap = [];
-        $this->encounteredFiles = [];
-
-        // Load existing hash map and check config hash if caching is enabled
-        if ($this->useCache && !$this->forceRebuild) {
-            $this->hashMap = $this->loadHashMap();
-            $currentConfigHash = $this->calculateConfigHash();
-            $storedConfigHash = $this->hashMap['_config_hash'] ?? null;
-            
-            if ($currentConfigHash !== $storedConfigHash) {
-                echo "Configuration changed or cache invalidated. Forcing full documentation rebuild.\n";
-                // Clear file hashes but keep the config hash key for updating later
-                $fileHashes = $this->hashMap;
-                unset($fileHashes['_config_hash']);
-                $this->hashMap = ['_config_hash' => $currentConfigHash];
-                // Mark for rebuild internally by setting forceRebuild temporarily
-                // This ensures config hash is updated even if generate() is interrupted
-                $this->forceRebuild = true; // Temporarily force rebuild for this run
-            } else {
-                 echo "Using existing cache file: {$this->cacheFilePath}\n";
-            }
-        }
-
-        // If forcing rebuild (either via option or config change), ensure config hash is set
-        if ($this->useCache && $this->forceRebuild) {
-             $this->hashMap['_config_hash'] = $this->calculateConfigHash();
-             echo "Cache will be rebuilt.\n";
-        }
-
-        // Process each source directory
-        foreach ($this->sourceDirs as $sourceDir) {
-            if (file_exists($sourceDir)) {
-                echo "Processing directory: {$sourceDir}\n";
-                $this->processDirectory($sourceDir);
-            } else {
-                echo "Directory not found: {$sourceDir}\n";
-            }
-        }
-
-        // --- Start Orphan Cleanup ---
-        if ($this->useCache) {
-            $cachedFiles = array_keys(array_filter($this->hashMap, fn($key) => $key !== '_config_hash', ARRAY_FILTER_USE_KEY));
-            $orphans = array_diff($cachedFiles, $this->encounteredFiles);
-
-            if (!empty($orphans)) {
-                echo "Cleaning up documentation for deleted source files...\n";
-                $outputDirPrefixed = rtrim($this->outputDir, "/") . "/";
-
-                foreach ($orphans as $orphanSourcePath) {
-                    // Find the original base source directory for the orphan
-                    $baseSourceDir = null;
-                    foreach ($this->sourceDirs as $dir) {
-                        // Ensure consistent directory separators and trailing slash for comparison
-                        $normalizedDir = rtrim(str_replace('\\', '/', $dir), '/') . '/';
-                        $normalizedOrphanPath = str_replace('\\', '/', $orphanSourcePath);
-
-                        if (strpos($normalizedOrphanPath, $normalizedDir) === 0) {
-                            $baseSourceDir = $dir;
-                            break;
-                        }
-                    }
-
-                    if ($baseSourceDir) {
-                        $relPath = substr($orphanSourcePath, strlen(rtrim($baseSourceDir, '/')) + 1);
-                        $sourceDirName = basename(rtrim($baseSourceDir, "/"));
-                        $fullRelPath = $sourceDirName . "/" . $relPath;
-                        $relDir = dirname($fullRelPath);
-                        $fileName = pathinfo($relPath, PATHINFO_FILENAME);
-                        $docPath = $outputDirPrefixed . $relDir . "/" . $fileName . ".md";
-
-                        if (file_exists($docPath)) {
-                            echo "Deleting orphan documentation: {$docPath}\n";
-                            @unlink($docPath); // Use @ to suppress errors if deletion fails
-                        }
-                    } else {
-                        echo "Warning: Could not determine source directory for orphan path: {$orphanSourcePath}\n";
-                    }
-
-                    // Remove orphan from the hash map regardless
-                    unset($this->hashMap[$orphanSourcePath]);
-                }
-            }
-        }
-        // --- End Orphan Cleanup ---
-
-        // Make sure the index is fully up to date
-        $this->finalizeDocumentationIndex();
-
-        // Save the updated hash map if caching is enabled
-        if ($this->useCache) {
-            $this->saveHashMap($this->hashMap);
-        }
-
-        echo "\nDocumentation generation complete! Files are available in the '{$this->outputDir}' directory.\n";
-    }
-
-    /**
      * Finalize the documentation index to ensure it's complete
      */
     private function finalizeDocumentationIndex(): void
@@ -1348,27 +1388,6 @@ class Docudoodle
         $outputDir = rtrim($this->outputDir, "/") . "/";
         $this->updateDocumentationIndex("", $outputDir);
         echo "Documentation index finalized.\n";
-    }
-
-    /**
-     * Load the hash map from the cache file.
-     *
-     * @return array The loaded hash map or empty array on failure/not found.
-     */
-    private function loadHashMap(): array
-    {
-        if (!$this->useCache || !$this->cacheFilePath || !file_exists($this->cacheFilePath)) {
-            return [];
-        }
-
-        try {
-            $content = file_get_contents($this->cacheFilePath);
-            $map = json_decode($content, true);
-            return is_array($map) ? $map : [];
-        } catch (Exception $e) {
-            echo "Warning: Could not read or decode cache file: {$this->cacheFilePath} - {$e->getMessage()}\n";
-            return [];
-        }
     }
 
     /**
@@ -1392,36 +1411,5 @@ class Docudoodle
         } catch (Exception $e) {
             echo "Warning: Could not save cache file: {$this->cacheFilePath} - {$e->getMessage()}\n";
         }
-    }
-
-    /**
-     * Calculate the SHA1 hash of a file's content.
-     *
-     * @param string $filePath Path to the file.
-     * @return string|false The SHA1 hash or false on failure.
-     */
-    private function calculateFileHash(string $filePath): string|false
-    {
-        if (!file_exists($filePath)) {
-            return false;
-        }
-        return sha1_file($filePath);
-    }
-
-    /**
-     * Calculate a hash representing the current configuration relevant to caching.
-     *
-     * @return string The configuration hash.
-     */
-    private function calculateConfigHash(): string
-    {
-        $realTemplatePath = realpath($this->promptTemplate) ?: $this->promptTemplate; // Use realpath or fallback
-        $configData = [
-            'model' => $this->model,
-            'apiProvider' => $this->apiProvider,
-            'promptTemplatePath' => $realTemplatePath, // Use normalized path
-            'promptTemplateContent' => file_exists($this->promptTemplate) ? sha1_file($this->promptTemplate) : 'template_not_found'
-        ];
-        return sha1(json_encode($configData));
     }
 }
