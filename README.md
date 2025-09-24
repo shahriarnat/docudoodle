@@ -161,7 +161,7 @@ Specify which file types Docudoodle should process. By default, it handles PHP a
 ### Skip Directories
 
 ```php
-'default_skip_dirs' => ['vendor/', 'node_modules/', 'tests/', 'cache/'],
+'default_skip_dirs' => ['vendor/', 'node_modules/', 'tests/', 'cache/', '/wildcard/*/path/'],
 ```
 
 Define directories that should be excluded from documentation generation.
