@@ -291,7 +291,8 @@ class Docudoodle
 
             // Check if parent directory should be processed
             $relDirPath = dirname($relFilePath);
-            if (!$this->shouldProcessDirectory($relDirPath)) {
+
+            if (!$this->shouldProcessDirectory($relDirPath, $sourcePath)) {
                 continue;
             }
 
@@ -305,18 +306,23 @@ class Docudoodle
     /**
      * Check if directory should be processed based on allowed subdirectories
      */
-    private function shouldProcessDirectory($dirPath): bool
+    private function shouldProcessDirectory($dirPath, $relFilePath): bool
     {
         // Normalize directory path for comparison
         $dirPath = rtrim($dirPath, "/") . "/";
+        $relFilePath = rtrim(dirname($relFilePath), "/") . "/";
 
         // Check if directory or any parent directory is in the skip list
         foreach ($this->skipSubdirectories as $skipDir) {
-            $skipDir = rtrim($skipDir, "/") . "/";
 
+            $skipDir = rtrim($skipDir, "/") . "/";
             // Check if this directory is a subdirectory of a skipped directory
             // or if it matches exactly a skipped directory
             if (strpos($dirPath, $skipDir) === 0 || $dirPath === $skipDir) {
+                return false;
+            }
+
+            if (preg_match('#' . str_replace('*', '.*?', $skipDir) . '#', $relFilePath)) {
                 return false;
             }
 
@@ -328,7 +334,6 @@ class Docudoodle
                 }
             }
         }
-
         return true;
     }
 
@@ -972,6 +977,7 @@ class Docudoodle
      */
     private function generateDocumentationWithClaude($filePath, $content, $context = []): string
     {
+        return "";
         try {
             // Check content length and truncate if necessary
             if (strlen($content) > $this->maxTokens * 4) {
@@ -1005,6 +1011,7 @@ class Docudoodle
             ]);
 
             $response = curl_exec($ch);
+
             if (curl_errno($ch)) {
                 throw new Exception(curl_error($ch));
             }
@@ -1015,7 +1022,7 @@ class Docudoodle
             if (isset($responseData["content"][0]["text"])) {
                 return $responseData["content"][0]["text"];
             } else {
-                throw new Exception("Unexpected API response format");
+                throw new Exception("Unexpected API response format: " . print_r($responseData, true));
             }
         } catch (Exception $e) {
             die ("# Documentation Generation Error\n\nThere was an error generating documentation for this file: " . $e->getMessage());
