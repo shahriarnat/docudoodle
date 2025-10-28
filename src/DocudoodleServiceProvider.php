@@ -2,6 +2,7 @@
 
 namespace Docudoodle;
 
+use Docudoodle\Commands\FindDiff;
 use Illuminate\Support\ServiceProvider;
 use Docudoodle\Commands\GenerateDocsCommand;
 
@@ -17,10 +18,11 @@ class DocudoodleServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->commands([
                 GenerateDocsCommand::class,
+                FindDiff::class
             ]);
-            
+
             $this->publishes([
-                __DIR__.'/../config/docudoodle.php' => config_path('docudoodle.php'),
+                __DIR__ . '/../config/docudoodle.php' => config_path('docudoodle.php'),
             ], 'docudoodle-config');
         }
     }
@@ -33,7 +35,7 @@ class DocudoodleServiceProvider extends ServiceProvider
     public function register()
     {
         $this->mergeConfigFrom(
-            __DIR__.'/../config/docudoodle.php', 'docudoodle'
+            __DIR__ . '/../config/docudoodle.php', 'docudoodle'
         );
     }
 }

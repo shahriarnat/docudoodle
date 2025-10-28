@@ -68,7 +68,7 @@ return [
     |--------------------------------------------------------------------------
     |
     | Settings for the Ollama API which runs locally.
-    | 
+    |
     | host: The host where Ollama is running (default: localhost)
     | port: The port Ollama is listening on (default: 11434)
     |
@@ -189,5 +189,5 @@ return [
     | The path to the prompt template file.
     |
     */
-    'prompt_template' => env('DOCUDOODLE_PROMPT_TEMPLATE', __DIR__.'/../../resources/templates/default-prompt.md'),
+    'prompt_template' => env('DOCUDOODLE_PROMPT_TEMPLATE', __DIR__ . '/../../resources/templates/default-prompt.md'),
 ];

@@ -977,7 +977,6 @@ class Docudoodle
      */
     private function generateDocumentationWithClaude($filePath, $content, $context = []): string
     {
-        return "";
         try {
             // Check content length and truncate if necessary
             if (strlen($content) > $this->maxTokens * 4) {

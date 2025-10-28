@@ -12,7 +12,7 @@ class GenerateDocsCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'docudoodle:generate 
+    protected $signature = 'docudoodle:generate
                             {--source=* : Directories to process (default: from config or app/, config/, routes/, database/)}
                             {--output= : Output directory for documentation (default: from config or "documentation")}
                             {--model= : Model to use (default: from config or gpt-4o-mini)}
@@ -91,9 +91,9 @@ class GenerateDocsCommand extends Command
 
         $maxTokens = $this->option('max-tokens');
         if (empty($maxTokens)) {
-            $maxTokens = (int) config('docudoodle.max_tokens', 10000);
+            $maxTokens = (int)config('docudoodle.max_tokens', 10000);
         } else {
-            $maxTokens = (int) $maxTokens;
+            $maxTokens = (int)$maxTokens;
         }
 
         $extensions = $this->option('extensions');
@@ -109,12 +109,12 @@ class GenerateDocsCommand extends Command
         $ollamaHost = config('docudoodle.ollama_host', 'localhost');
         $ollamaPort = config('docudoodle.ollama_port', 5000);
 
-        
+
         // Azure OpenAI specific configuration
         $azureEndpoint = $this->option('azure-endpoint');
         $azureDeployment = $this->option('azure-deployment');
         $azureApiVersion = $this->option('azure-api-version');
-        
+
         if (empty($azureEndpoint)) {
             $azureEndpoint = config('docudoodle.azure_endpoint', '');
         }
@@ -124,7 +124,7 @@ class GenerateDocsCommand extends Command
         if (empty($azureApiVersion)) {
             $azureApiVersion = config('docudoodle.azure_api_version', '2023-05-15');
         }
-        
+
 
         // Handle Jira configuration
         $jiraConfig = [];
@@ -139,7 +139,7 @@ class GenerateDocsCommand extends Command
             ];
 
             // Validate Jira configuration
-            if (empty($jiraConfig['host']) || empty($jiraConfig['api_token']) || 
+            if (empty($jiraConfig['host']) || empty($jiraConfig['api_token']) ||
                 empty($jiraConfig['email']) || empty($jiraConfig['project_key'])) {
                 $this->error('Jira integration is enabled but configuration is incomplete. Please check your .env file.');
                 return 1;
@@ -159,7 +159,7 @@ class GenerateDocsCommand extends Command
             ];
 
             // Validate Confluence configuration
-            if (empty($confluenceConfig['host']) || empty($confluenceConfig['api_token']) || 
+            if (empty($confluenceConfig['host']) || empty($confluenceConfig['api_token']) ||
                 empty($confluenceConfig['email']) || empty($confluenceConfig['space_key'])) {
                 $this->error('Confluence integration is enabled but configuration is incomplete. Please check your .env file.');
                 return 1;
@@ -172,7 +172,7 @@ class GenerateDocsCommand extends Command
         }
 
         // Convert relative paths to absolute paths based on Laravel's base path
-        $sourceDirs = array_map(function($dir) {
+        $sourceDirs = array_map(function ($dir) {
             return base_path($dir);
         }, $sourceDirs);
 
@@ -190,7 +190,7 @@ class GenerateDocsCommand extends Command
         $cachePath = $this->option('cache-path');
         if (empty($cachePath)) {
             $cachePath = config('docudoodle.cache_file_path', null);
-        } 
+        }
         if ($useCache) {
             $this->info('Cache enabled.' . ($cachePath ? " Path: {$cachePath}" : ' Using default path'));
             if ($bypassCache) {
@@ -202,7 +202,7 @@ class GenerateDocsCommand extends Command
 
         $promptTemplate = $this->option('prompt-template');
         if (empty($promptTemplate)) {
-            $promptTemplate = config('docudoodle.prompt_template', __DIR__.'/../../resources/templates/default-prompt.md');
+            $promptTemplate = config('docudoodle.prompt_template', __DIR__ . '/../../resources/templates/default-prompt.md');
         }
 
         try {
